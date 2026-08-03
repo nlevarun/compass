@@ -5,6 +5,7 @@
 fastapi==0.109.0
 uvicorn[standard]==0.27.0
 python-multipart==0.0.6
+websockets==12.0
 
 # Database
 sqlalchemy==2.0.25
@@ -13,8 +14,11 @@ sqlalchemy==2.0.25
 vaderSentiment==3.3.2
 textblob==0.17.1
 
-# Slack Integration (optional)
-slack-sdk==3.26.2
+# Source Integrations (optional - install only what you need)
+slack-sdk==3.26.2        # For Slack integration
+PyGithub==2.1.1          # For GitHub issues/discussions
+discord.py==2.3.2        # For Discord communities
+praw==7.7.1              # For Reddit (Python Reddit API Wrapper)
 
 # Utilities
 python-dotenv==1.0.0
