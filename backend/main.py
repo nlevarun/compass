@@ -53,7 +53,7 @@ from priority.calculator import (
 )
 from priority.impact_predictor import ImpactPredictor
 from priority.custom_scoring import CustomScoringEngine, compare_formulas
-from websockets import manager, handle_client_message
+from ws_manager import manager, handle_client_message
 from events import event_emitter, TaskTracker
 
 
