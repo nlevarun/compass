@@ -7,7 +7,7 @@ import PriorityAnalysis from './components/PriorityAnalysis';
 import OfflineBanner from './components/OfflineBanner';
 import InstallPrompt from './components/InstallPrompt';
 import Toast from './components/Toast';
-import { websocketService } from './services/websocket';
+import websocketService from './services/websocket';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');

@@ -28,4 +28,30 @@ export const getRoadmap = () => api.get('/api/roadmap');
 // Stats
 export const getStats = () => api.get('/api/stats');
 
+// Priority Analysis
+export const predictImpact = (data) => api.post('/api/roadmap/predict-impact', data);
+export const calculateCustomScore = (data) => api.post('/api/priority/custom-score', data);
+export const getAtRiskCustomers = () => api.get('/api/priority/at-risk-customers');
+export const getRoadmapExplanation = (id) => api.get(`/api/roadmap/${id}/explanation`);
+export const getFormulaPresets = () => api.get('/api/priority/formulas/presets');
+export const compareFormulas = (data) => api.post('/api/priority/formulas/compare', data);
+
+// Imports
+export const importZendesk = (data) => api.post('/api/import/zendesk', data);
+export const importIntercom = (data) => api.post('/api/import/intercom', data);
+export const importCSV = (formData) => api.post('/api/import/csv', formData, {
+  headers: { 'Content-Type': 'multipart/form-data' }
+});
+export const getImportJob = (jobId) => api.get(`/api/import/job/${jobId}`);
+
+// Jira Integration
+export const createJiraIssue = (data) => api.post('/api/jira/create', data);
+export const syncJiraIssue = (issueKey) => api.post(`/api/jira/sync/${issueKey}`);
+export const getJiraIssues = (params) => api.get('/api/jira/issues', { params });
+
+// Linear Integration
+export const createLinearIssue = (data) => api.post('/api/linear/create', data);
+export const syncLinearIssue = (issueId) => api.post(`/api/linear/sync/${issueId}`);
+export const getLinearIssues = (params) => api.get('/api/linear/issues', { params });
+
 export default api;
