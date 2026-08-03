@@ -68,7 +68,7 @@ function RoadmapDashboard() {
           </div>
           <div className="flex items-center">
             <div className="w-3 h-3 rounded-full bg-green-500 mr-2"></div>
-            <span>Low (<30)</span>
+            <span>Low (&lt;30)</span>
           </div>
         </div>
       </div>
