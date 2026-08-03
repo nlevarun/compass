@@ -241,5 +241,5 @@ MIT License - Built as a portfolio project demonstrating:
 
 ---
 
-**Built by:** Varun Nalubolu
+**Built by:** Varun Venkatesh
 **Contact:** [GitHub](https://github.com/nlevarun)
