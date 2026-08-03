@@ -1,0 +1,4 @@
+Git author updated to: Varun Venkatesh <varunvenkatesh@berkeley.edu>
+
+All future commits will use this identity.
+Previous commits retain original author (cannot be changed without force-push/rebase).
