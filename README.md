@@ -1,4 +1,4 @@
-# Compass - Customer Feedback Intelligence Platform
+# Compass
 
 **Aggregates feedback from 8+ sources, uses NLP clustering to group similar requests, and generates data-driven roadmap prioritization.**
 
