@@ -165,7 +165,7 @@ class SlackSource(FeedbackSource):
                         "text": message.get("text", ""),
                         "customer_name": user_name,
                         "submitted_at": datetime.fromtimestamp(float(message["ts"])),
-                        "metadata": {
+                        "source_metadata": {
                             "channel_id": channel_id,
                             "message_ts": message["ts"],
                             "user_id": user_id,

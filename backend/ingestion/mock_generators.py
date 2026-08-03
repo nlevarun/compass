@@ -222,7 +222,7 @@ def generate_mock_feedback(source_name: str, count: int) -> List[Dict]:
             "customer_revenue": revenue,
             "sentiment_score": round(sentiment, 3),
             "submitted_at": generate_temporal_date(),
-            "metadata": {
+            "source_metadata": {
                 "theme": theme,
                 "source": source_name,
                 "synthetic": True

@@ -51,15 +51,23 @@ cd compass
 ```bash
 cd backend
 
-# Create virtual environment (recommended)
-python3 -m venv venv
+# Create virtual environment with Python 3.12 (recommended)
+python3.12 -m venv venv
 source venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# Install minimal dependencies (fast, works on all Macs)
+pip install -r requirements-minimal.txt
+
+# OR for full ML features (slower, requires compatible torch):
+# pip install -r requirements-minimal.txt
 
 # Initialize database
 python database.py
+```
+
+**Note:** The minimal install uses lightweight NLP (keyword-based clustering). For full ML features (sentence-transformers), install torch separately after:
+```bash
+pip install torch sentence-transformers scikit-learn numpy
 ```
 
 Expected output:
@@ -171,7 +179,7 @@ If you have multiple Python versions:
 # Use specific version
 python3.12 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-minimal.txt
 ```
 
 ### Port Already in Use
@@ -199,7 +207,7 @@ pip install --user -r requirements.txt
 # Or use virtual environment (recommended)
 python3 -m venv venv
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-minimal.txt
 ```
 
 ### Slow Clustering
@@ -309,7 +317,7 @@ git pull origin main
 # Update backend dependencies
 cd backend
 source venv/bin/activate
-pip install -r requirements.txt
+pip install -r requirements-minimal.txt
 
 # Update frontend dependencies
 cd ../frontend

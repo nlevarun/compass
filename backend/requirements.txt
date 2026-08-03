@@ -7,11 +7,13 @@ python-multipart==0.0.6
 sqlalchemy==2.0.25
 alembic==1.13.1
 
-# NLP & ML
-sentence-transformers==2.3.1
-scikit-learn==1.4.0
-numpy==1.26.3
-torch==2.1.2
+# NLP & ML (Optional - install separately if needed)
+# For full ML features, run: pip install torch sentence-transformers scikit-learn
+# sentence-transformers>=2.3.0
+# scikit-learn>=1.4.0
+# numpy>=1.26.0
+
+# Lightweight NLP (always installed)
 vaderSentiment==3.3.2
 textblob==0.17.1
 

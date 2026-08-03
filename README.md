@@ -60,7 +60,11 @@ compass/
 cd compass/backend
 
 # Install dependencies (requires Python 3.12+)
-pip install -r requirements.txt
+# Minimal install (works on all platforms including Mac):
+pip install -r requirements-minimal.txt
+
+# OR full install with ML (may require additional setup on Mac):
+# pip install -r requirements.txt
 
 # Initialize database
 python database.py
@@ -69,6 +73,8 @@ python database.py
 python main.py
 # Or: uvicorn main:app --reload
 ```
+
+**Mac Users:** See [MAC_SETUP.md](MAC_SETUP.md) for detailed macOS instructions.
 
 API will be available at `http://localhost:8000`
 

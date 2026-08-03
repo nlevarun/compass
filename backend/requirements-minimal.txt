@@ -1,0 +1,26 @@
+# Minimal requirements for quick setup (works on all platforms including Mac)
+# For full ML features, install: pip install torch sentence-transformers scikit-learn
+
+# Core Framework
+fastapi==0.109.0
+uvicorn[standard]==0.27.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.25
+
+# Lightweight NLP
+vaderSentiment==3.3.2
+textblob==0.17.1
+
+# Slack Integration (optional)
+slack-sdk==3.26.2
+
+# Utilities
+python-dotenv==1.0.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+httpx==0.26.0
+
+# Data Processing
+pandas==2.2.0

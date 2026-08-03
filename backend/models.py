@@ -59,7 +59,7 @@ class Feedback(Base):
     embedding = Column(JSON, nullable=True)  # Serialized vector for similarity search
 
     # Source-specific metadata
-    metadata = Column(JSON)  # email_id, ticket_id, slack_msg_id, etc.
+    source_metadata = Column(JSON)  # email_id, ticket_id, slack_msg_id, etc.
 
     # Relationships
     source = relationship("Source", back_populates="feedback")
