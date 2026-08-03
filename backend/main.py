@@ -1022,9 +1022,9 @@ async def run_import_job_background(job_id: str, job_type: str, config: Dict, db
     """Background task to run import job."""
     import sys
     sys.path.append('/home/wsl-user/compass/backend')
-    from import.zendesk_importer import ZendeskImporter
-    from import.intercom_importer import IntercomImporter
-    from import.csv_importer import CSVImporter
+    from importers.zendesk_importer import ZendeskImporter
+    from importers.intercom_importer import IntercomImporter
+    from importers.csv_importer import CSVImporter
 
     job = db.query(ImportJob).filter(ImportJob.id == job_id).first()
     job.status = "running"
@@ -1219,7 +1219,7 @@ async def import_csv(
         f.write(content)
 
     # Preview CSV structure
-    from import.csv_importer import CSVImporter
+    from importers.csv_importer import CSVImporter
     temp_source = db.query(Source).first()  # Use any source temporarily
     importer = CSVImporter(file_path, temp_source.id if temp_source else 1, db)
     preview = importer.preview_csv(num_rows=5)
