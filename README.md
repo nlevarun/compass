@@ -2,15 +2,15 @@
 
 **Aggregates feedback from 8+ sources, uses NLP clustering to group similar requests, and generates data-driven roadmap prioritization.**
 
-## 🎯 Key Metrics
+## Key Metrics
 
-- ✅ **8+ feedback sources** (1 real Slack API, 7 mock)
-- ✅ **500+ feedback entries** processed
-- 🎯 **85%+ NLP clustering accuracy** target
-- ⚡ **3 days → 30 minutes** prioritization time reduction
-- 🚀 **<30 seconds** roadmap generation
+- **8+ feedback sources** (1 real Slack API, 7 mock)
+- **500+ feedback entries** processed
+- **85%+ NLP clustering accuracy** target
+- **3 days to 30 minutes** prioritization time reduction
+- **Under 30 seconds** roadmap generation
 
-## 🏗️ Architecture
+## Architecture
 
 ### Tech Stack
 
@@ -27,12 +27,12 @@
 - Real-time dashboard updates
 
 **Integrations:**
-- ✅ Slack API (OAuth)
-- 📧 Email, Support Tickets, Surveys
-- 📱 App Reviews, Sales Calls
-- 👥 User Interviews, Social Media
+- Slack API (OAuth)
+- Email, Support Tickets, Surveys
+- App Reviews, Sales Calls
+- User Interviews, Social Media
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 compass/
@@ -52,7 +52,7 @@ compass/
 └── frontend/                  # React frontend (coming soon)
 ```
 
-## 🚀 Quick Start
+## Quick Start
 
 ### Backend Setup
 
@@ -98,7 +98,7 @@ curl -X POST http://localhost:8000/api/roadmap/generate
 curl http://localhost:8000/api/roadmap
 ```
 
-## 🧠 How It Works
+## How It Works
 
 ### 1. **Feedback Ingestion**
 - Connects to 8 sources (1 real Slack, 7 mock)
@@ -127,7 +127,7 @@ Where:
 - Generates actionable roadmap items
 - Provides insights (high/medium/low priority distribution)
 
-## 📊 Database Schema
+## Database Schema
 
 **Sources** → **Feedback** → **Clusters** → **RoadmapItems**
 
@@ -136,7 +136,7 @@ Where:
 - **Cluster**: NLP-generated group of similar feedback
 - **RoadmapItem**: Prioritized feature with rank and metrics
 
-## 🔧 Configuration
+## Configuration
 
 ### Mock Data Generation
 
@@ -165,7 +165,7 @@ source.config = {
 }
 ```
 
-## 🧪 Testing
+## Testing
 
 ```bash
 # Test database models
@@ -181,7 +181,7 @@ python backend/nlp/clustering.py
 python backend/priority/calculator.py
 ```
 
-## 📈 Success Criteria
+## Success Criteria
 
 - [x] Database schema with PostgreSQL migration path
 - [x] 8 feedback sources (1 real, 7 mock)
@@ -194,7 +194,7 @@ python backend/priority/calculator.py
 - [ ] <30s end-to-end performance
 - [ ] Slack OAuth full integration
 
-## 🔜 Roadmap
+## Roadmap
 
 **Phase 2: Frontend (In Progress)**
 - React dashboard with Vite + Tailwind
@@ -214,7 +214,7 @@ python backend/priority/calculator.py
 - Production deployment guide
 - CI/CD pipeline
 
-## 📝 Development Notes
+## Development Notes
 
 **Current Status:** Backend complete, frontend in development
 
@@ -231,7 +231,7 @@ git commit -m "feat: implement clustering engine"
 git push origin main
 ```
 
-## 📄 License
+## License
 
 MIT License - Built as a portfolio project demonstrating:
 - Product management (feedback aggregation, prioritization)
