@@ -23,7 +23,7 @@ import json
 import time
 
 from sqlalchemy.orm import Session
-from database import get_db_session, init_db
+from database import get_db_session, get_db, init_db
 from models import Source, Feedback, Cluster, RoadmapItem
 from ingestion.sources import create_source, MOCK_SOURCES
 from nlp.clustering import FeedbackClusterer, validate_clustering_accuracy
@@ -56,7 +56,7 @@ async def startup_event():
     init_db()
 
     # Create mock sources if they don't exist
-    with get_db_session() as db:
+    with get_db() as db:
         existing_sources = db.query(Source).count()
         if existing_sources == 0:
             print("Creating mock sources...")
