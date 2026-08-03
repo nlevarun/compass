@@ -7,14 +7,18 @@ Uses:
 - Extractive summarization for cluster labels
 """
 
+from __future__ import annotations
 import json
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Tuple, Optional, TYPE_CHECKING, Any
 from collections import Counter
 import sys
 import os
 
 # Add parent directory to path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+if TYPE_CHECKING:
+    import numpy as np
 
 try:
     from sentence_transformers import SentenceTransformer
@@ -24,6 +28,7 @@ try:
     DEPS_AVAILABLE = True
 except ImportError:
     DEPS_AVAILABLE = False
+    np = None  # type: ignore
     print("⚠️  NLP dependencies not installed. Using simplified clustering.")
 
 
@@ -55,7 +60,7 @@ class FeedbackClusterer:
         else:
             self.model = None
 
-    def generate_embeddings(self, texts: List[str], batch_size: int = 32) -> np.ndarray:
+    def generate_embeddings(self, texts: List[str], batch_size: int = 32) -> Any:
         """
         Generate semantic embeddings for texts.
 
@@ -102,7 +107,7 @@ class FeedbackClusterer:
 
         return embeddings
 
-    def cluster_feedback(self, texts: List[str], embeddings: Optional[np.ndarray] = None) -> Tuple[np.ndarray, Dict]:
+    def cluster_feedback(self, texts: List[str], embeddings: Optional[Any] = None) -> Tuple[Any, Dict]:
         """
         Cluster feedback using DBSCAN.
 
@@ -224,7 +229,7 @@ class FeedbackClusterer:
 
         return label or "Miscellaneous Feedback"
 
-    def calculate_centroid(self, embeddings: np.ndarray) -> List[float]:
+    def calculate_centroid(self, embeddings: Any) -> List[float]:
         """Calculate cluster centroid (mean embedding)."""
         if DEPS_AVAILABLE:
             return embeddings.mean(axis=0).tolist()
