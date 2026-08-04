@@ -489,7 +489,25 @@ async def sync_slack_messages(
             error_msg = f"Slack API error: {str(e)}"
             print(f"❌ {error_msg}")
             print(f"   Response: {e.response}")
-            raise HTTPException(status_code=400, detail=error_msg)
+
+            # Provide helpful error messages for common issues
+            if e.response.get("error") == "not_in_channel":
+                raise HTTPException(
+                    status_code=400,
+                    detail="Bot is not in this channel. Please invite the bot by typing '/invite @YourAppName' in the Slack channel first."
+                )
+            elif e.response.get("error") == "channel_not_found":
+                raise HTTPException(
+                    status_code=404,
+                    detail="Channel not found. It may have been deleted or archived."
+                )
+            elif e.response.get("error") == "missing_scope":
+                raise HTTPException(
+                    status_code=403,
+                    detail="Missing required Slack permissions. Please reconnect your workspace with updated permissions."
+                )
+            else:
+                raise HTTPException(status_code=400, detail=error_msg)
         except Exception as e:
             error_msg = f"Unexpected error: {str(e)}"
             print(f"❌ {error_msg}")
