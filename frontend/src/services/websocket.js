@@ -353,6 +353,13 @@ class WebSocketService {
   }
 
   /**
+   * Subscribe to an event type (alias for 'on')
+   */
+  subscribe(eventType, callback) {
+    return this.on(eventType, callback);
+  }
+
+  /**
    * Subscribe to an event type
    */
   on(eventType, callback) {
@@ -462,10 +469,9 @@ class WebSocketService {
 // Create singleton instance
 const wsService = new WebSocketService();
 
-// Auto-connect on module load
+// Don't auto-connect on module load to prevent crashes
+// Let components call connect() when ready
 if (typeof window !== 'undefined') {
-  wsService.connect();
-
   // Cleanup on page unload
   window.addEventListener('beforeunload', () => {
     wsService.disconnect();

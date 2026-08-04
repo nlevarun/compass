@@ -16,20 +16,28 @@ function Dashboard() {
   const loadStats = async () => {
     try {
       const response = await getStats();
-      setStats(response.data);
+      const data = response?.data || {};
+      setStats(data);
 
       // Determine current step based on data
-      if (response.data.total_feedback === 0) {
+      if ((data.total_feedback || 0) === 0) {
         setCurrentStep(0);
-      } else if (response.data.total_clusters === 0) {
+      } else if ((data.total_clusters || 0) === 0) {
         setCurrentStep(1);
-      } else if (response.data.total_roadmap_items === 0) {
+      } else if ((data.total_roadmap_items || 0) === 0) {
         setCurrentStep(2);
       } else {
         setCurrentStep(3);
       }
     } catch (error) {
       console.error('Failed to load stats:', error);
+      // Set default stats on error
+      setStats({
+        total_feedback: 0,
+        total_clusters: 0,
+        total_roadmap_items: 0,
+        total_revenue_impact: 0
+      });
     } finally {
       setLoading(false);
     }
@@ -42,7 +50,8 @@ function Dashboard() {
       await loadStats();
     } catch (error) {
       console.error('Sync failed:', error);
-      alert('Sync failed. Please check console for details.');
+      const errorMsg = error.response?.data?.detail || error.message || 'Sync failed. Please check your connection.';
+      alert(errorMsg);
     } finally {
       setSyncing(false);
     }
@@ -55,7 +64,8 @@ function Dashboard() {
       await loadStats();
     } catch (error) {
       console.error('Clustering failed:', error);
-      alert('Clustering failed. Please check console for details.');
+      const errorMsg = error.response?.data?.detail || error.message || 'Clustering failed. Please check your connection.';
+      alert(errorMsg);
     } finally {
       setClustering(false);
     }
@@ -68,7 +78,8 @@ function Dashboard() {
       await loadStats();
     } catch (error) {
       console.error('Roadmap generation failed:', error);
-      alert('Roadmap generation failed. Please check console for details.');
+      const errorMsg = error.response?.data?.detail || error.message || 'Roadmap generation failed. Please check your connection.';
+      alert(errorMsg);
     } finally {
       setGenerating(false);
     }

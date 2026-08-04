@@ -15,9 +15,10 @@ function ClusterView() {
     setLoading(true);
     try {
       const response = await getClusters();
-      setClusters(response.data);
+      setClusters(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to load clusters:', error);
+      setClusters([]);
     } finally {
       setLoading(false);
     }
@@ -32,16 +33,24 @@ function ClusterView() {
     setDetailLoading(true);
     try {
       const response = await getClusterDetail(clusterId);
-      setSelectedCluster(response.data);
+      setSelectedCluster(response?.data || null);
     } catch (error) {
       console.error('Failed to load cluster detail:', error);
+      alert('Failed to load cluster details. Please try again.');
     } finally {
       setDetailLoading(false);
     }
   };
 
   if (loading) {
-    return <div className="text-center py-12">Loading clusters...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading clusters...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

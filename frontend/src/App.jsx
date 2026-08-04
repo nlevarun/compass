@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import ErrorBoundary from './components/ErrorBoundary';
 import FeedbackInbox from './components/FeedbackInbox';
 import ClusterView from './components/ClusterView';
 import RoadmapDashboard from './components/RoadmapDashboard';
@@ -15,17 +16,25 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Connect to WebSocket
-    websocketService.connect();
+    // Connect to WebSocket with error handling
+    try {
+      websocketService.connect();
+    } catch (error) {
+      console.error('Failed to connect to WebSocket:', error);
+    }
 
     // Listen for connection status
-    const unsubscribe = websocketService.subscribe('connection', (data) => {
-      setIsConnected(data.connected);
+    const unsubscribe = websocketService.onStateChange((newState) => {
+      setIsConnected(newState === 'connected');
     });
 
     return () => {
       unsubscribe();
-      websocketService.disconnect();
+      try {
+        websocketService.disconnect();
+      } catch (error) {
+        console.error('Error disconnecting WebSocket:', error);
+      }
     };
   }, []);
 
@@ -56,7 +65,13 @@ function App() {
       {/* Toasts */}
       <div className="fixed top-4 right-4 z-50 space-y-2">
         {toasts.map(toast => (
-          <Toast key={toast.id} message={toast.message} type={toast.type} />
+          <Toast
+            key={toast.id}
+            id={toast.id}
+            title={toast.message}
+            level={toast.type}
+            onClose={(id) => setToasts(prev => prev.filter(t => t.id !== id))}
+          />
         ))}
       </div>
 
@@ -119,11 +134,13 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        {activeTab === 'dashboard' && <Dashboard showToast={showToast} />}
-        {activeTab === 'feedback' && <FeedbackInbox showToast={showToast} />}
-        {activeTab === 'clusters' && <ClusterView showToast={showToast} />}
-        {activeTab === 'roadmap' && <RoadmapDashboard showToast={showToast} />}
-        {activeTab === 'priority' && <PriorityAnalysis showToast={showToast} />}
+        <ErrorBoundary key={activeTab}>
+          {activeTab === 'dashboard' && <Dashboard showToast={showToast} />}
+          {activeTab === 'feedback' && <FeedbackInbox showToast={showToast} />}
+          {activeTab === 'clusters' && <ClusterView showToast={showToast} />}
+          {activeTab === 'roadmap' && <RoadmapDashboard showToast={showToast} />}
+          {activeTab === 'priority' && <PriorityAnalysis showToast={showToast} />}
+        </ErrorBoundary>
       </main>
     </div>
   );

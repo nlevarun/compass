@@ -14,9 +14,10 @@ function RoadmapDashboard() {
     setLoading(true);
     try {
       const response = await getRoadmap();
-      setRoadmap(response.data);
+      setRoadmap(Array.isArray(response?.data) ? response.data : []);
     } catch (error) {
       console.error('Failed to load roadmap:', error);
+      setRoadmap([]);
     } finally {
       setLoading(false);
     }
@@ -27,7 +28,14 @@ function RoadmapDashboard() {
     : roadmap.filter((item) => item.status === filter);
 
   if (loading) {
-    return <div className="text-center py-12">Loading roadmap...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading roadmap...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

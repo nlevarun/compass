@@ -21,10 +21,13 @@ function FeedbackInbox() {
         getFeedback(filters),
         getSources(),
       ]);
-      setFeedback(feedbackRes.data);
-      setSources(sourcesRes.data);
+      setFeedback(Array.isArray(feedbackRes?.data) ? feedbackRes.data : []);
+      setSources(Array.isArray(sourcesRes?.data) ? sourcesRes.data : []);
     } catch (error) {
       console.error('Failed to load feedback:', error);
+      // Set empty arrays on error to prevent crashes
+      setFeedback([]);
+      setSources([]);
     } finally {
       setLoading(false);
     }
@@ -47,7 +50,14 @@ function FeedbackInbox() {
   };
 
   if (loading) {
-    return <div className="text-center py-12">Loading feedback...</div>;
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Loading feedback...</p>
+        </div>
+      </div>
+    );
   }
 
   return (

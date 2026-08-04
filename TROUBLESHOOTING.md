@@ -4,15 +4,31 @@
 
 If you're seeing errors like "no such column: feedback.external_ids", the database schema is out of sync.
 
-### Solution: Fresh Start (Recommended)
+### Solution 1: Use the Fix Script (Recommended - Works on All Platforms)
 
 ```bash
-cd ~/compass/backend
+cd compass/backend
+
+# Stop backend if running (Ctrl+C)
+
+# Run the fix script (works on Windows, Mac, Linux)
+python fix_db.py
+
+# Restart backend - it will create fresh database
+python main.py
+```
+
+### Solution 2: Manual Fix
+
+```bash
+cd compass/backend
 
 # Stop backend if running (Ctrl+C)
 
 # Delete old database
-rm -f compass.db
+rm -f compass.db           # Mac/Linux
+# or
+del compass.db             # Windows
 
 # Pull latest code
 git pull origin main
@@ -23,7 +39,110 @@ python main.py
 
 That's it! The backend automatically creates the database with correct schema on startup.
 
+## 🧪 Validation Script
+
+To check if your system is set up correctly, run:
+
+```bash
+cd compass/backend
+python validate_system.py
+```
+
+This comprehensive script checks:
+- All required files exist
+- Database schema is correct
+- Python dependencies are installed
+- Cross-platform compatibility
+- API endpoints are defined
+- Frontend integration
+- Mock data generation works
+
+**Example output:**
+```
+[1/8] Validating File Structure...
+  ✓ File: backend/main.py
+  ✓ File: backend/models.py
+  ...
+[2/8] Checking Python Dependencies...
+  ✓ Dependency: fastapi
+  ...
+VALIDATION SUMMARY
+Tests Run: 45
+Passed: 45
+Failed: 0
+✓ ALL CHECKS PASSED - System is ready!
+```
+
 ---
+
+## 🎯 Common Error Patterns & Solutions
+
+### Database Schema Mismatch
+
+**Error Messages:**
+- `no such column: feedback.external_ids`
+- `no such table: import_jobs`
+- `no such table: linear_issues`
+
+**Cause:** Database file was created with an old schema version.
+
+**Solution:**
+```bash
+cd compass/backend
+python fix_db.py
+python main.py
+```
+
+### Import Errors
+
+**Error Messages:**
+- `ModuleNotFoundError: No module named 'fastapi'`
+- `ImportError: cannot import name 'X' from 'Y'`
+
+**Cause:** Missing Python dependencies.
+
+**Solution:**
+```bash
+cd compass/backend
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install --upgrade -r requirements-minimal.txt
+```
+
+### Path Errors (Windows-Specific)
+
+**Error Messages:**
+- `FileNotFoundError: [Errno 2] No such file or directory`
+- Path separator issues
+
+**Cause:** Windows uses different path separators.
+
+**Solution:** All scripts now use `pathlib.Path` for cross-platform compatibility. If you see this error, make sure you're running the latest version:
+```bash
+git pull origin main
+```
+
+### Database Locked
+
+**Error Messages:**
+- `database is locked`
+- `OperationalError: database is locked`
+
+**Cause:** Another process is accessing the database, or previous process didn't close properly.
+
+**Solution:**
+```bash
+# Kill any running backend processes
+# Mac/Linux:
+lsof -ti:8000 | xargs kill -9
+
+# Windows:
+netstat -ano | findstr :8000
+taskkill /PID <PID> /F
+
+# Delete lock files
+cd compass/backend
+rm -f compass.db-wal compass.db-shm
+```
 
 ## Common Issues & Fixes
 
@@ -273,3 +392,231 @@ npm run dev
 - ✅ Comprehensive API docs
 
 Sleep well! Everything will work tomorrow. 🚀
+
+---
+
+## 🛠️ Using the Database Fix Script
+
+The `fix_db.py` script is a universal tool that works on all platforms (Windows, Mac, Linux).
+
+### What it does:
+
+1. Finds and deletes old database files (compass.db and any *.db files)
+2. Verifies models.py can be loaded
+3. Confirms all required models are defined
+4. Provides clear next steps
+
+### Usage:
+
+```bash
+cd compass/backend
+python fix_db.py
+```
+
+### When to use it:
+
+- Database schema errors
+- "no such column" errors
+- "no such table" errors
+- After pulling new code that changes database schema
+- When starting fresh
+
+### What it checks:
+
+```
+✅ Deleted old database: compass.db
+✅ models.py loaded successfully
+  ✓ Source model found
+  ✓ Feedback model found
+  ✓ Cluster model found
+  ✓ RoadmapItem model found
+  ✓ ImportJob model found
+  ✓ JiraIssue model found
+  ✓ LinearIssue model found
+```
+
+---
+
+## 🧪 Using the Validation Script
+
+The `validate_system.py` script performs comprehensive system validation.
+
+### What it checks:
+
+1. **File Structure** - All required files exist
+2. **Python Dependencies** - Critical and optional packages
+3. **Database Schema** - All tables and columns are correct
+4. **Model Integrity** - SQLAlchemy models are properly defined
+5. **Cross-Platform Compatibility** - No hardcoded paths
+6. **API Endpoints** - All critical endpoints are defined
+7. **Frontend Integration** - API client matches backend
+8. **Mock Data Generation** - Data generation works
+
+### Usage:
+
+```bash
+cd compass/backend
+python validate_system.py
+```
+
+### Sample Output:
+
+```
+======================================================================
+COMPASS SYSTEM VALIDATION
+======================================================================
+Root directory: /home/user/compass
+Backend directory: /home/user/compass/backend
+Frontend directory: /home/user/compass/frontend
+
+[1/8] Validating File Structure...
+  ✓ File: backend/main.py
+  ✓ File: backend/models.py
+  ✓ File: backend/database.py
+  ...
+
+[2/8] Checking Python Dependencies...
+  ✓ Dependency: fastapi
+  ✓ Dependency: uvicorn
+  ✓ Dependency: sqlalchemy
+  ...
+
+[3/8] Validating Database Schema...
+  ✓ Table: sources (9 columns)
+  ✓ Table: feedback (14 columns)
+  ✓ Column: feedback.external_ids
+  ...
+
+[4/8] Checking Model Integrity...
+  ✓ Model: Source (Table: sources)
+  ✓ Model: Feedback (Table: feedback)
+  ...
+
+[5/8] Checking Cross-Platform Compatibility...
+  ✓ Path compatibility (No hardcoded path separators found)
+  ✓ Database path (Database path is relative)
+
+[6/8] Validating API Endpoints...
+  ✓ Endpoint: GET /api/sources
+  ✓ Endpoint: POST /api/sources/sync
+  ✓ Endpoint: GET /api/feedback
+  ...
+
+[7/8] Checking Frontend Integration...
+  ✓ Frontend API: getSources
+  ✓ Frontend API: syncSources
+  ✓ Environment variables (Frontend uses environment variables for API URL)
+  ...
+
+[8/8] Testing Mock Data Generation...
+  ✓ Mock data generation (Generated 1 feedback items successfully)
+
+======================================================================
+VALIDATION SUMMARY
+======================================================================
+Tests Run: 45
+Passed: 45
+Failed: 0
+Warnings: 0
+
+✓ ALL CHECKS PASSED - System is ready!
+```
+
+### When to use it:
+
+- After fresh installation
+- Before starting development
+- After updating code
+- When troubleshooting issues
+- To verify cross-platform setup
+- Before deploying to new environment
+
+### Error Handling:
+
+If validation fails, the script provides:
+- Clear error messages
+- Specific file/function that failed
+- Recommended fixes
+- Common troubleshooting steps
+
+---
+
+## 📋 Pre-Flight Checklist
+
+Before starting Compass, run through this checklist:
+
+### Backend Setup
+```bash
+cd compass/backend
+
+# 1. Check Python version (needs 3.12+)
+python --version
+
+# 2. Activate virtual environment
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+
+# 3. Install/update dependencies
+pip install -r requirements-minimal.txt
+
+# 4. Run validation
+python validate_system.py
+
+# 5. If database issues, run fix script
+python fix_db.py
+
+# 6. Start backend
+python main.py
+```
+
+### Frontend Setup
+```bash
+cd compass/frontend
+
+# 1. Check Node version (needs 18+)
+node --version
+
+# 2. Install dependencies
+npm install
+
+# 3. Start frontend
+npm run dev
+```
+
+### Verify Running
+- Backend API docs: http://localhost:8000/docs
+- Frontend app: http://localhost:5173
+- WebSocket: Green indicator in top-right of UI
+
+---
+
+## 🚨 Emergency Reset (Nuclear Option)
+
+If everything is completely broken and nothing works:
+
+```bash
+# 1. Stop all processes (Ctrl+C in both terminals)
+
+# 2. Navigate to compass directory
+cd ~/compass
+
+# 3. Pull latest code
+git pull origin main
+
+# 4. Backend reset
+cd backend
+rm -f compass.db *.db-wal *.db-shm
+rm -rf venv
+python3 -m venv venv
+source venv/bin/activate  # or venv\Scripts\activate on Windows
+pip install -r requirements-minimal.txt
+python validate_system.py
+python main.py
+
+# 5. Frontend reset (in new terminal)
+cd compass/frontend
+rm -rf node_modules package-lock.json
+npm install
+npm run dev
+```
+
+This completely resets everything to a clean state.

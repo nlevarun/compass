@@ -50,18 +50,22 @@ function PriorityAnalysis() {
   const loadAtRiskCustomers = async () => {
     try {
       const response = await getAtRiskCustomers();
-      setAtRiskCustomers(response.data.at_risk_customers || []);
+      const customers = response?.data?.at_risk_customers;
+      setAtRiskCustomers(Array.isArray(customers) ? customers : []);
     } catch (error) {
       console.error('Failed to load at-risk customers:', error);
+      setAtRiskCustomers([]);
     }
   };
 
   const loadFormulaPresets = async () => {
     try {
       const response = await getFormulaPresets();
-      setFormulaPresets(response.data.presets || []);
+      const presets = response?.data?.presets;
+      setFormulaPresets(Array.isArray(presets) ? presets : []);
     } catch (error) {
       console.error('Failed to load formula presets:', error);
+      setFormulaPresets([]);
     }
   };
 
@@ -78,10 +82,11 @@ function PriorityAnalysis() {
     setLoading(true);
     try {
       const response = await predictImpact(impactForm);
-      setImpactResult(response.data.prediction);
+      setImpactResult(response?.data?.prediction || null);
     } catch (error) {
       console.error('Failed to predict impact:', error);
-      alert('Failed to predict impact. Please check your inputs.');
+      const errorMsg = error.response?.data?.detail || 'Failed to predict impact. Please check your inputs and connection.';
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -94,10 +99,11 @@ function PriorityAnalysis() {
         formula: customFormula,
         variables: formulaVariables
       });
-      setFormulaResult(response.data.result);
+      setFormulaResult(response?.data?.result || null);
     } catch (error) {
       console.error('Failed to calculate score:', error);
-      alert('Invalid formula or variables. Please check your inputs.');
+      const errorMsg = error.response?.data?.detail || 'Invalid formula or variables. Please check your inputs.';
+      alert(errorMsg);
     } finally {
       setLoading(false);
     }

@@ -42,14 +42,22 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 def init_db():
     """Initialize database by creating all tables."""
-    Base.metadata.create_all(bind=engine)
-    print(f"✓ Database initialized at {DATABASE_URL}")
+    try:
+        Base.metadata.create_all(bind=engine)
+        print(f"✓ Database initialized at {DATABASE_URL}")
+    except Exception as e:
+        print(f"✗ Error initializing database: {e}")
+        raise
 
 
 def drop_all_tables():
     """Drop all tables (use with caution!)"""
-    Base.metadata.drop_all(bind=engine)
-    print("✓ All tables dropped")
+    try:
+        Base.metadata.drop_all(bind=engine)
+        print("✓ All tables dropped")
+    except Exception as e:
+        print(f"✗ Error dropping tables: {e}")
+        raise
 
 
 @contextmanager
@@ -106,18 +114,24 @@ def migrate_to_postgresql(pg_url: str):
 if __name__ == "__main__":
     # Initialize database when run directly
     print("Initializing Compass database...")
-    init_db()
+    try:
+        init_db()
 
-    # Verify tables created
-    from sqlalchemy import inspect
-    inspector = inspect(engine)
-    tables = inspector.get_table_names()
-    print(f"\n✓ Created tables: {', '.join(tables)}")
+        # Verify tables created
+        from sqlalchemy import inspect
+        inspector = inspect(engine)
+        tables = inspector.get_table_names()
+        print(f"\n✓ Created tables: {', '.join(tables)}")
 
-    # Show schema
-    print("\nDatabase schema:")
-    for table in tables:
-        columns = inspector.get_columns(table)
-        print(f"\n{table}:")
-        for col in columns:
-            print(f"  - {col['name']}: {col['type']}")
+        # Show schema
+        print("\nDatabase schema:")
+        for table in tables:
+            columns = inspector.get_columns(table)
+            print(f"\n{table}:")
+            for col in columns:
+                print(f"  - {col['name']}: {col['type']}")
+    except Exception as e:
+        print(f"\n✗ Error during database initialization: {e}")
+        import traceback
+        traceback.print_exc()
+        exit(1)
