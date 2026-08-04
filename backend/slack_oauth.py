@@ -439,10 +439,16 @@ async def sync_slack_messages(
                 submitted_at = datetime.fromtimestamp(timestamp)
 
                 # Check if message already exists
-                existing = db.query(Feedback).filter(
-                    Feedback.source_id == source_id,
-                    Feedback.source_metadata["slack_ts"].astext == msg["ts"]
-                ).first()
+                # Note: Using simple approach since SQLite doesn't support JSONB operators
+                existing_feedbacks = db.query(Feedback).filter(
+                    Feedback.source_id == source_id
+                ).all()
+
+                existing = None
+                for fb in existing_feedbacks:
+                    if fb.source_metadata and fb.source_metadata.get("slack_ts") == msg["ts"]:
+                        existing = fb
+                        break
 
                 if not existing:
                     feedback = Feedback(
