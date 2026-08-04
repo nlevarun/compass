@@ -486,4 +486,13 @@ async def sync_slack_messages(
             }
 
         except SlackApiError as e:
-            raise HTTPException(status_code=400, detail=f"Slack API error: {str(e)}")
+            error_msg = f"Slack API error: {str(e)}"
+            print(f"❌ {error_msg}")
+            print(f"   Response: {e.response}")
+            raise HTTPException(status_code=400, detail=error_msg)
+        except Exception as e:
+            error_msg = f"Unexpected error: {str(e)}"
+            print(f"❌ {error_msg}")
+            import traceback
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=error_msg)
