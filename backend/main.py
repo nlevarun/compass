@@ -65,8 +65,10 @@ from priority.impact_predictor import ImpactPredictor
 from priority.custom_scoring import CustomScoringEngine, compare_formulas
 from ws_manager import manager, handle_client_message
 from events import event_emitter, TaskTracker
-from webhook_receivers import slack_router, github_router, intercom_router
-from public_board_api import router as public_board_router
+
+# Future features - will be implemented by agents
+# from webhook_receivers import slack_router, github_router, intercom_router
+# from public_board_api import router as public_board_router
 
 
 # Initialize FastAPI app
@@ -85,13 +87,11 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include webhook receiver routers
-app.include_router(slack_router)
-app.include_router(github_router)
-app.include_router(intercom_router)
-
-# Include public board router (Canny competitor feature)
-app.include_router(public_board_router)
+# Webhook receivers and public board - will be added when agents complete
+# app.include_router(slack_router)
+# app.include_router(github_router)
+# app.include_router(intercom_router)
+# app.include_router(public_board_router)
 
 
 # Initialize database on startup
