@@ -1734,6 +1734,198 @@ async def sync_all_jira_issues(
     return result
 
 
+# --- Slack Connector Endpoints ---
+
+class SlackConnectRequest(BaseModel):
+    """Request model for connecting Slack."""
+    token: str
+    channel_id: str
+
+
+class SlackSyncRequest(BaseModel):
+    """Request model for syncing Slack messages."""
+    limit: Optional[int] = 100
+
+
+@app.post("/api/connectors/slack/test")
+async def test_slack_connection(request: SlackConnectRequest):
+    """Test Slack connection and get available channels."""
+    from connectors.slack import test_slack_connection
+
+    result = test_slack_connection(request.token)
+
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result.get("error", "Connection failed"))
+
+    return result
+
+
+@app.post("/api/connectors/slack/connect")
+async def connect_slack(
+    request: SlackConnectRequest,
+    db: Session = Depends(get_db_session)
+):
+    """Connect Slack workspace and channel."""
+    from connectors.slack import SlackConnector
+
+    # Test connection first
+    connector = SlackConnector(request.token, request.channel_id)
+
+    if not connector.test_connection():
+        raise HTTPException(status_code=400, detail="Invalid Slack token or connection failed")
+
+    # Save or update Slack source
+    source = db.query(Source).filter(Source.name == "Slack").first()
+
+    if not source:
+        source = Source(
+            name="Slack",
+            source_type="real",
+            is_active=True,
+            config={
+                "token": request.token,
+                "channel_id": request.channel_id
+            }
+        )
+        db.add(source)
+    else:
+        source.config = {
+            "token": request.token,
+            "channel_id": request.channel_id
+        }
+        source.is_active = True
+
+    db.commit()
+
+    # Emit event
+    await event_emitter.emit({
+        "type": "source_connected",
+        "data": {
+            "source": "Slack",
+            "channel_id": request.channel_id
+        }
+    })
+
+    return {
+        "status": "success",
+        "message": "Slack connected successfully",
+        "source_id": source.id
+    }
+
+
+@app.post("/api/connectors/slack/sync")
+async def sync_slack_messages(
+    request: Optional[SlackSyncRequest] = None,
+    db: Session = Depends(get_db_session)
+):
+    """Sync messages from Slack channel."""
+    from connectors.slack import SlackConnector
+
+    # Get Slack source
+    source = db.query(Source).filter(Source.name == "Slack").first()
+
+    if not source or not source.is_active:
+        raise HTTPException(status_code=400, detail="Slack not connected. Connect first via POST /api/connectors/slack/connect")
+
+    config = source.config
+    if not config or not config.get("token") or not config.get("channel_id"):
+        raise HTTPException(status_code=400, detail="Slack configuration incomplete")
+
+    # Create connector
+    connector = SlackConnector(config["token"], config["channel_id"])
+
+    # Fetch messages
+    limit = request.limit if request else 100
+    messages = connector.fetch_messages(limit=limit)
+
+    # Save messages to database
+    synced_count = 0
+    for msg in messages:
+        # Check if message already exists (by timestamp and source)
+        existing = db.query(Feedback).filter(
+            Feedback.source_id == source.id,
+            Feedback.source_metadata.contains({"slack_ts": msg["timestamp"]})
+        ).first()
+
+        if not existing:
+            feedback = Feedback(
+                source_id=source.id,
+                text=msg["text"],
+                customer_name=msg["user"],
+                submitted_at=datetime.fromtimestamp(float(msg["timestamp"])),
+                source_metadata={
+                    "slack_ts": msg["timestamp"],
+                    "slack_link": msg["link"],
+                    "slack_user": msg["user"]
+                }
+            )
+            db.add(feedback)
+            synced_count += 1
+
+    db.commit()
+
+    # Update last synced timestamp
+    source.last_synced_at = datetime.utcnow()
+    db.commit()
+
+    # Emit event
+    await event_emitter.emit({
+        "type": "feedback_synced",
+        "data": {
+            "source": "Slack",
+            "count": synced_count
+        }
+    })
+
+    return {
+        "status": "success",
+        "synced": synced_count,
+        "total_fetched": len(messages),
+        "message": f"Synced {synced_count} new messages from Slack"
+    }
+
+
+@app.get("/api/connectors/slack/channels")
+async def get_slack_channels(db: Session = Depends(get_db_session)):
+    """Get list of available Slack channels."""
+    from connectors.slack import SlackConnector
+
+    # Get Slack source
+    source = db.query(Source).filter(Source.name == "Slack").first()
+
+    if not source or not source.config or not source.config.get("token"):
+        raise HTTPException(status_code=400, detail="Slack not configured. Connect first.")
+
+    connector = SlackConnector(source.config["token"])
+    channels = connector.get_channels()
+
+    return {
+        "channels": channels,
+        "count": len(channels)
+    }
+
+
+@app.get("/api/connectors/slack/status")
+async def get_slack_status(db: Session = Depends(get_db_session)):
+    """Get Slack connection status."""
+    source = db.query(Source).filter(Source.name == "Slack").first()
+
+    if not source:
+        return {
+            "connected": False,
+            "message": "Slack not configured"
+        }
+
+    feedback_count = db.query(Feedback).filter(Feedback.source_id == source.id).count()
+
+    return {
+        "connected": source.is_active,
+        "channel_id": source.config.get("channel_id") if source.config else None,
+        "last_synced": source.last_synced_at.isoformat() if source.last_synced_at else None,
+        "feedback_count": feedback_count
+    }
+
+
 # --- Linear Integration Endpoints ---
 
 class LinearConfigRequest(BaseModel):

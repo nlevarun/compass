@@ -51,6 +51,8 @@ export const getFeedback = (params = {}) => api.get('/api/feedback', { params })
 
 // Clustering
 export const runClustering = (params = {}) => api.post('/api/clustering/run', null, { params });
+export const runBERTopicClustering = (params = {}) => api.post('/api/clustering/bertopic', null, { params });
+export const getClusteringQuality = () => api.get('/api/clustering/quality');
 export const getClusters = () => api.get('/api/clusters');
 export const getClusterDetail = (id) => api.get(`/api/clusters/${id}`);
 

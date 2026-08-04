@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getClusters, getClusterDetail } from '../services/api';
+import ClusteringStats from './ClusteringStats';
 
 function ClusterView() {
   const [clusters, setClusters] = useState([]);
@@ -62,6 +63,9 @@ function ClusterView() {
           {clusters.length} clusters discovered by NLP
         </p>
       </div>
+
+      {/* Clustering Quality Stats */}
+      {clusters.length > 0 && <ClusteringStats />}
 
       {/* Clusters Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

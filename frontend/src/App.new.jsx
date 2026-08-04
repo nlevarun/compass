@@ -1,20 +1,26 @@
 import { useState, useEffect } from 'react';
+import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import ErrorBoundary from './components/ErrorBoundary';
 import FeedbackInbox from './components/FeedbackInbox';
 import ClusterView from './components/ClusterView';
 import RoadmapDashboard from './components/RoadmapDashboard';
 import Dashboard from './components/Dashboard';
 import PriorityAnalysis from './components/PriorityAnalysis';
-import SlackConnector from './components/SlackConnector';
 import OfflineBanner from './components/OfflineBanner';
 import InstallPrompt from './components/InstallPrompt';
 import Toast from './components/Toast';
+import PublicBoard from './components/PublicBoard';
+import BoardCreator from './components/BoardCreator';
+import BoardAdmin from './components/BoardAdmin';
 import websocketService from './services/websocket';
 
-function App() {
-  const [activeTab, setActiveTab] = useState('dashboard');
+function MainApp() {
   const [toasts, setToasts] = useState([]);
   const [isConnected, setIsConnected] = useState(false);
+  const location = useLocation();
+
+  // Check if we're on a public board route
+  const isPublicRoute = location.pathname.startsWith('/boards/');
 
   useEffect(() => {
     // Connect to WebSocket with error handling
@@ -47,15 +53,33 @@ function App() {
     }, 5000);
   };
 
-  const tabs = [
-    { id: 'dashboard', name: 'Overview' },
-    { id: 'collect', name: 'Collect' },
-    { id: 'feedback', name: 'Feedback' },
-    { id: 'clusters', name: 'Insights' },
-    { id: 'roadmap', name: 'Roadmap' },
-    { id: 'priority', name: 'Priority Analysis' },
-  ];
+  // If on public board route, show minimal layout
+  if (isPublicRoute) {
+    return (
+      <div className="min-h-screen">
+        {/* Toasts */}
+        <div className="fixed top-4 right-4 z-50 space-y-2">
+          {toasts.map(toast => (
+            <Toast
+              key={toast.id}
+              id={toast.id}
+              title={toast.message}
+              level={toast.type}
+              onClose={(id) => setToasts(prev => prev.filter(t => t.id !== id))}
+            />
+          ))}
+        </div>
 
+        <Routes>
+          <Route path="/boards/create" element={<BoardCreator />} />
+          <Route path="/boards/:slug" element={<PublicBoard />} />
+          <Route path="/boards/:slug/admin" element={<BoardAdmin />} />
+        </Routes>
+      </div>
+    );
+  }
+
+  // Standard app layout with navigation
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Offline Banner */}
@@ -96,21 +120,11 @@ function App() {
 
             {/* Navigation Tabs */}
             <nav className="flex space-x-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`
-                    px-4 py-2 text-sm font-medium rounded-lg transition-colors
-                    ${activeTab === tab.id
-                      ? 'bg-gray-100 text-gray-900'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
-                    }
-                  `}
-                >
-                  {tab.name}
-                </button>
-              ))}
+              <NavLink to="/" label="Overview" />
+              <NavLink to="/feedback" label="Feedback" />
+              <NavLink to="/clusters" label="Insights" />
+              <NavLink to="/roadmap" label="Roadmap" />
+              <NavLink to="/priority" label="Priority Analysis" />
             </nav>
 
             {/* User Menu */}
@@ -136,24 +150,45 @@ function App() {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
-        <ErrorBoundary key={activeTab}>
-          {activeTab === 'dashboard' && <Dashboard showToast={showToast} />}
-          {activeTab === 'collect' && (
-            <div>
-              <div className="mb-6">
-                <h2 className="text-2xl font-bold text-gray-900">Collect Feedback</h2>
-                <p className="text-gray-600 mt-1">Connect data sources to import customer feedback</p>
-              </div>
-              <SlackConnector />
-            </div>
-          )}
-          {activeTab === 'feedback' && <FeedbackInbox showToast={showToast} />}
-          {activeTab === 'clusters' && <ClusterView showToast={showToast} />}
-          {activeTab === 'roadmap' && <RoadmapDashboard showToast={showToast} />}
-          {activeTab === 'priority' && <PriorityAnalysis showToast={showToast} />}
+        <ErrorBoundary>
+          <Routes>
+            <Route path="/" element={<Dashboard showToast={showToast} />} />
+            <Route path="/feedback" element={<FeedbackInbox showToast={showToast} />} />
+            <Route path="/clusters" element={<ClusterView showToast={showToast} />} />
+            <Route path="/roadmap" element={<RoadmapDashboard showToast={showToast} />} />
+            <Route path="/priority" element={<PriorityAnalysis showToast={showToast} />} />
+          </Routes>
         </ErrorBoundary>
       </main>
     </div>
+  );
+}
+
+function NavLink({ to, label }) {
+  const location = useLocation();
+  const isActive = location.pathname === to;
+
+  return (
+    <Link
+      to={to}
+      className={`
+        px-4 py-2 text-sm font-medium rounded-lg transition-colors
+        ${isActive
+          ? 'bg-gray-100 text-gray-900'
+          : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+        }
+      `}
+    >
+      {label}
+    </Link>
+  );
+}
+
+function App() {
+  return (
+    <BrowserRouter>
+      <MainApp />
+    </BrowserRouter>
   );
 }
 

@@ -374,6 +374,204 @@ feature_release_mapping = Table(
 )
 
 
+class PublicBoard(Base):
+    """Public feedback board (Canny competitor feature)"""
+    __tablename__ = "public_boards"
+
+    id = Column(String(50), primary_key=True)  # UUID
+    slug = Column(String(100), unique=True, nullable=False)  # compass.app/boards/acme-feedback
+
+    # Board info
+    organization_name = Column(String(200), nullable=False)
+    title = Column(String(200), nullable=False)
+    description = Column(Text, nullable=True)
+
+    # Settings
+    is_public = Column(Boolean, default=True)
+    allow_anonymous = Column(Boolean, default=True)
+    custom_domain = Column(String(200), nullable=True)
+    theme_color = Column(String(7), default="#4F46E5")  # Hex color
+
+    # Admin
+    owner_email = Column(String(200), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    posts = relationship("PublicPost", back_populates="board", cascade="all, delete-orphan")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_board_slug", "slug"),
+    )
+
+    def __repr__(self):
+        return f"<PublicBoard(id={self.id}, slug='{self.slug}', title='{self.title}')>"
+
+
+class PublicPost(Base):
+    """Feedback post on a public board"""
+    __tablename__ = "public_posts"
+
+    id = Column(String(50), primary_key=True)  # UUID
+    board_id = Column(String(50), ForeignKey("public_boards.id"), nullable=False)
+
+    # Content
+    title = Column(String(500), nullable=False)
+    description = Column(Text, nullable=True)
+    category = Column(String(50), nullable=True)  # feature, bug, improvement, question
+
+    # Status
+    status = Column(String(50), default="open")  # open, planned, in_progress, completed, closed
+
+    # Voting metrics
+    vote_count = Column(Integer, default=0)
+    revenue_weighted_score = Column(Float, default=0.0)  # UNIQUE TO COMPASS!
+
+    # Author info (can be anonymous)
+    author_email = Column(String(200), nullable=True)
+    author_name = Column(String(200), nullable=True)
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    board = relationship("PublicBoard", back_populates="posts")
+    votes = relationship("Vote", back_populates="post", cascade="all, delete-orphan")
+    comments = relationship("Comment", back_populates="post", cascade="all, delete-orphan")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_post_board", "board_id"),
+        Index("idx_post_status", "status"),
+        Index("idx_post_votes", "vote_count"),
+        Index("idx_post_revenue_score", "revenue_weighted_score"),
+    )
+
+    def __repr__(self):
+        return f"<PublicPost(id={self.id}, title='{self.title}', votes={self.vote_count})>"
+
+
+class Vote(Base):
+    """Vote on a public post (with revenue weighting)"""
+    __tablename__ = "votes"
+
+    id = Column(String(50), primary_key=True)  # UUID
+    post_id = Column(String(50), ForeignKey("public_posts.id"), nullable=False)
+
+    # Voter info
+    user_email = Column(String(200), nullable=False)
+    user_name = Column(String(200), nullable=True)
+    user_revenue = Column(Float, default=0.0)  # Annual revenue for revenue-weighted voting!
+
+    # Timestamp
+    voted_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    post = relationship("PublicPost", back_populates="votes")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_vote_post", "post_id"),
+        Index("idx_vote_email", "user_email"),
+    )
+
+    def __repr__(self):
+        return f"<Vote(id={self.id}, post_id={self.post_id}, revenue=${self.user_revenue:.0f})>"
+
+
+class Comment(Base):
+    """Comment on a public post"""
+    __tablename__ = "comments"
+
+    id = Column(String(50), primary_key=True)  # UUID
+    post_id = Column(String(50), ForeignKey("public_posts.id"), nullable=False)
+
+    # Content
+    text = Column(Text, nullable=False)
+
+    # Author info
+    author_email = Column(String(200), nullable=True)
+    author_name = Column(String(200), nullable=True)
+    is_admin = Column(Boolean, default=False)  # Board owner response
+
+    # Timestamp
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Relationships
+    post = relationship("PublicPost", back_populates="comments")
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_comment_post", "post_id"),
+    )
+
+    def __repr__(self):
+        return f"<Comment(id={self.id}, post_id={self.post_id})>"
+
+
+class WebhookReceiverConfig(Base):
+    """Configuration for inbound webhook receivers (Slack, GitHub, Intercom, etc.)"""
+    __tablename__ = "webhook_receiver_configs"
+
+    id = Column(Integer, primary_key=True)
+    source_name = Column(String(100), nullable=False, unique=True)  # "Slack", "GitHub", "Intercom"
+    webhook_url = Column(String(500), nullable=False)  # The URL external services should POST to
+    secret_token = Column(String(200), nullable=True)  # For signature verification
+    is_active = Column(Boolean, default=True)
+
+    # Statistics
+    events_received = Column(Integer, default=0)
+    last_event_at = Column(DateTime, nullable=True)
+    total_processing_time_ms = Column(Float, default=0.0)  # Sum of all processing times
+    avg_processing_time_ms = Column(Float, default=0.0)  # Average latency
+
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_webhook_receiver_source", "source_name"),
+        Index("idx_webhook_receiver_active", "is_active"),
+    )
+
+    def __repr__(self):
+        return f"<WebhookReceiverConfig(source='{self.source_name}', events={self.events_received}, avg_latency={self.avg_processing_time_ms:.2f}ms)>"
+
+
+class WebhookEvent(Base):
+    """Log of webhook events received (for debugging and analytics)"""
+    __tablename__ = "webhook_events"
+
+    id = Column(Integer, primary_key=True)
+    source_name = Column(String(100), nullable=False)  # "Slack", "GitHub", "Intercom"
+    event_type = Column(String(100), nullable=False)  # "message", "issue_opened", "conversation_created"
+    payload = Column(JSON)  # Raw event payload
+    feedback_id = Column(Integer, ForeignKey("feedback.id"), nullable=True)  # Created feedback
+
+    # Performance metrics
+    processing_time_ms = Column(Float, nullable=True)
+    success = Column(Boolean, default=True)
+    error_message = Column(Text, nullable=True)
+
+    # Timestamps
+    received_at = Column(DateTime, default=datetime.utcnow)
+
+    # Indexes
+    __table_args__ = (
+        Index("idx_webhook_event_source", "source_name", "received_at"),
+        Index("idx_webhook_event_feedback", "feedback_id"),
+    )
+
+    def __repr__(self):
+        return f"<WebhookEvent(source='{self.source_name}', type='{self.event_type}', success={self.success})>"
+
+
 # Database utility functions for easy PostgreSQL migration
 def get_connection_string(db_type: str = "sqlite", db_path: str = "compass.db") -> str:
     """
