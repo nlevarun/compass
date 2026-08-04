@@ -19,10 +19,23 @@ from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 
 # Core imports (guaranteed to work)
 from database import get_db_session, init_db
 from models import Source, Feedback, Cluster, RoadmapItem
+
+# Import Slack OAuth router
+try:
+    from slack_oauth import router as slack_oauth_router
+    SLACK_OAUTH_AVAILABLE = True
+except ImportError:
+    SLACK_OAUTH_AVAILABLE = False
+    print("⚠️  Slack OAuth not available (missing dependencies)")
 
 # Initialize FastAPI
 app = FastAPI(
@@ -39,6 +52,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include Slack OAuth router
+if SLACK_OAUTH_AVAILABLE:
+    app.include_router(slack_oauth_router)
 
 
 # ==================== Pydantic Models ====================
@@ -190,12 +207,10 @@ async def get_sources(db: Session = Depends(get_db_session)):
 @app.post("/api/sources/sync")
 async def sync_sources(db: Session = Depends(get_db_session)):
     """
-    Sync feedback from all active sources
-    For MVP, this generates sample data
+    Sync feedback from all active real integrations (Slack, GitHub, Discord, Reddit)
     """
     try:
-        import random
-        from datetime import timedelta
+        from ingestion.sources import create_source
 
         # Get all active sources
         sources = db.query(Source).filter(Source.is_active == True).all()
@@ -203,65 +218,72 @@ async def sync_sources(db: Session = Depends(get_db_session)):
         if not sources:
             return {
                 "status": "error",
-                "message": "No active sources found. Please run fix_all.py first."
+                "message": "No active sources found. Please connect a source (Slack, GitHub, Discord, or Reddit)."
             }
 
-        # Sample topics for mock data
-        topics = [
-            ("Mobile app crashes", "The mobile app keeps crashing when I try to load large datasets", -0.7),
-            ("Export feature", "Need ability to export data to Excel and CSV", 0.5),
-            ("Dark mode UI", "Dark mode would be great for late night work", 0.6),
-            ("API documentation", "API documentation is incomplete and confusing", -0.4),
-            ("SSO integration", "We need SSO integration with Azure AD", 0.3),
-            ("Bulk operations", "Cannot bulk edit or delete multiple items", -0.5),
-            ("Email notifications", "Not receiving email notifications for important events", -0.6),
-            ("Performance issues", "Dashboard loads very slowly with large datasets", -0.8),
-            ("Mobile offline mode", "Mobile app needs offline support", 0.4),
-            ("Reporting features", "Advanced reporting and analytics would be valuable", 0.7),
-        ]
+        total_new_feedback = 0
+        synced_sources = []
+        errors = []
 
-        customers = [
-            ("Acme Corporation", 500000),
-            ("TechStart Industries", 250000),
-            ("Global Systems Inc", 1000000),
-            ("StartupXYZ", 50000),
-            ("Enterprise Solutions LLC", 750000),
-            ("InnovateCo", 300000),
-            ("MegaCorp International", 2000000),
-        ]
+        # Sync each source
+        for source_model in sources:
+            try:
+                # Create source instance
+                source = create_source(source_model)
 
-        # Generate 20 new feedback items
-        new_feedback = []
-        for _ in range(20):
-            topic, text, sentiment = random.choice(topics)
-            customer_name, revenue = random.choice(customers)
-            source = random.choice(sources)
+                # Validate configuration
+                if not source.validate_config():
+                    errors.append(f"{source_model.name}: Missing or invalid configuration")
+                    continue
 
-            feedback = Feedback(
-                source_id=source.id,
-                text=f"{text} {random.choice(['This is critical for us.', 'Please prioritize!', 'Would help our team.', 'Really needed.'])}",
-                title=f"{topic} - {customer_name}",
-                customer_name=customer_name,
-                customer_revenue=revenue,
-                sentiment_score=sentiment + random.uniform(-0.1, 0.1),
-                submitted_at=datetime.utcnow() - timedelta(hours=random.randint(1, 48)),
-                source_metadata={"mock": True, "generated_by": "sync"}
-            )
-            db.add(feedback)
-            new_feedback.append(feedback)
+                # Fetch feedback since last sync
+                since = source_model.last_synced_at
+                feedback_list = source.fetch_feedback(since=since)
 
-        # Update last synced time
-        for source in sources:
-            source.last_synced_at = datetime.utcnow()
+                # Save to database
+                for feedback_data in feedback_list:
+                    feedback = Feedback(
+                        source_id=source_model.id,
+                        text=feedback_data.get("text", ""),
+                        title=feedback_data.get("title"),
+                        customer_name=feedback_data.get("customer_name"),
+                        customer_revenue=feedback_data.get("customer_revenue"),
+                        sentiment_score=feedback_data.get("sentiment_score"),
+                        submitted_at=feedback_data.get("submitted_at", datetime.utcnow()),
+                        source_metadata=feedback_data.get("source_metadata", {})
+                    )
+                    db.add(feedback)
+
+                # Update last synced time
+                source_model.last_synced_at = datetime.utcnow()
+                total_new_feedback += len(feedback_list)
+                synced_sources.append(source_model.name)
+
+            except ValueError as e:
+                errors.append(f"{source_model.name}: {str(e)}")
+            except Exception as e:
+                errors.append(f"{source_model.name}: Sync failed - {str(e)}")
 
         db.commit()
 
-        return {
-            "status": "success",
-            "synced_sources": len(sources),
-            "new_feedback": len(new_feedback),
-            "message": f"Synced {len(new_feedback)} new feedback items from {len(sources)} sources"
+        # Build response
+        response = {
+            "status": "success" if synced_sources else "partial",
+            "synced_sources": len(synced_sources),
+            "new_feedback": total_new_feedback,
+            "message": f"Synced {total_new_feedback} new feedback items from {len(synced_sources)} sources"
         }
+
+        if synced_sources:
+            response["sources"] = synced_sources
+
+        if errors:
+            response["errors"] = errors
+            if not synced_sources:
+                response["status"] = "error"
+                response["message"] = "No sources synced successfully. Check errors."
+
+        return response
 
     except Exception as e:
         db.rollback()

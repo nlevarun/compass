@@ -79,7 +79,6 @@ ingestion/
 ├── README.md                    # This file
 ├── INTEGRATION_GUIDE.md         # Comprehensive setup guide
 ├── sources.py                   # Source implementations
-├── mock_generators.py           # Mock data generation
 ├── test_new_sources.py          # Test script
 ├── setup_sources.py             # Interactive setup
 ├── sync.py                      # Automated sync script
@@ -95,7 +94,6 @@ Core source implementations:
 - `DiscordSource` - Discord integration
 - `RedditSource` - Reddit integration
 - `SlackSource` - Slack integration
-- Mock sources for demo data
 
 ### `sync.py`
 Automated sync script:
@@ -194,7 +192,7 @@ python sync.py --dry-run                   # Preview without saving
 
 # Development
 python sources.py                          # Test source creation
-python mock_generators.py                  # Generate mock data
+python test_new_sources.py                 # Test real integrations
 ```
 
 ## Scheduling Automated Syncs

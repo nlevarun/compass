@@ -151,7 +151,6 @@ class CompassValidator:
                 '__init__.py',
                 'sources.py',
                 'sync.py',
-                'mock_generators.py',
             ],
             'backend/nlp': [
                 '__init__.py',
@@ -541,40 +540,43 @@ class CompassValidator:
 
         try:
             sys.path.insert(0, str(self.backend_dir))
-            from ingestion.mock_generators import generate_mock_feedback
+            from ingestion.sources import create_source
             from models import Source
 
-            # Create a test source
-            test_source = Source(
-                id=1,
-                name="Test Source",
-                source_type="mock",
-                is_active=True
-            )
+            # Test that real source integrations are available
+            supported_sources = ["Slack", "GitHub", "Discord", "Reddit"]
+            available = []
 
-            # Generate one mock feedback
-            feedback = generate_mock_feedback(test_source, count=1)
+            for source_name in supported_sources:
+                test_source = Source(
+                    id=1,
+                    name=source_name,
+                    source_type="real",
+                    is_active=False,
+                    config={}
+                )
 
-            if feedback and len(feedback) > 0:
-                fb = feedback[0]
-                assert fb.text, "Feedback text is empty"
-                assert fb.customer_name, "Customer name is empty"
-                assert fb.sentiment_score is not None, "Sentiment score is None"
+                try:
+                    source_instance = create_source(test_source)
+                    available.append(source_name)
+                except ValueError:
+                    pass
 
+            if len(available) == len(supported_sources):
                 self.result.add_pass(
-                    "Mock data generation",
-                    f"Generated {len(feedback)} feedback items successfully"
+                    "Real source integrations",
+                    f"All {len(available)} integrations available: {', '.join(available)}"
                 )
             else:
                 self.result.add_fail(
-                    "Mock data generation",
-                    "No mock data generated"
+                    "Real source integrations",
+                    f"Only {len(available)}/{len(supported_sources)} integrations available"
                 )
 
         except Exception as e:
             self.result.add_fail(
-                "Mock Data Generation",
-                f"Error generating mock data: {str(e)}\n{traceback.format_exc()}"
+                "Real Source Integrations",
+                f"Error checking source integrations: {str(e)}\n{traceback.format_exc()}"
             )
         finally:
             os.chdir(original_dir)

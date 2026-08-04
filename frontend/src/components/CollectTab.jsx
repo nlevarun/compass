@@ -36,9 +36,6 @@ function CollectTab({ showToast }) {
     }
   };
 
-  const handleImportSample = async () => {
-    showToast('Sample data import coming soon', 'info');
-  };
 
   const sources = [
     {
@@ -150,15 +147,6 @@ function CollectTab({ showToast }) {
                 </>
               )}
             </button>
-            <button
-              onClick={handleImportSample}
-              className="inline-flex items-center px-5 py-2.5 text-sm font-medium text-gray-700 bg-white rounded-lg hover:bg-gray-50 border border-gray-300 transition-colors"
-            >
-              <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" />
-              </svg>
-              Import Sample Data
-            </button>
           </div>
         </div>
       </div>
@@ -201,20 +189,17 @@ function CollectTab({ showToast }) {
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">No feedback yet</h3>
             <p className="text-gray-600 mb-6 max-w-md mx-auto">
-              Import sample data to see how Compass works, or connect your sources to start collecting real feedback.
+              Connect your sources (Slack, GitHub, Discord, or Reddit) to start collecting real customer feedback.
             </p>
             <div className="flex items-center justify-center space-x-3">
               <button
-                onClick={handleImportSample}
-                className="inline-flex items-center px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                Import Sample Data
-              </button>
-              <button
                 onClick={handleSync}
                 disabled={syncing}
-                className="inline-flex items-center px-5 py-2.5 text-sm font-medium text-gray-700 bg-white rounded-lg hover:bg-gray-50 border border-gray-300 transition-colors"
+                className="inline-flex items-center px-5 py-2.5 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
               >
+                <svg className="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
                 Sync Sources
               </button>
             </div>

@@ -43,7 +43,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from database import get_db_session, get_db, init_db
 from models import Source, Feedback, Cluster, RoadmapItem
-from ingestion.sources import create_source, MOCK_SOURCES
 from nlp.clustering import FeedbackClusterer, validate_clustering_accuracy
 from nlp.sentiment import SentimentAnalyzer, categorize_sentiment
 
@@ -104,31 +103,13 @@ async def startup_event():
     # Connect event emitter to WebSocket manager
     event_emitter.set_manager(manager)
 
-    # Create mock sources if they don't exist
+    # Check for existing sources
     with get_db() as db:
         existing_sources = db.query(Source).count()
         if existing_sources == 0:
-            print("Creating mock sources...")
-            for source_name, config in MOCK_SOURCES.items():
-                source = Source(
-                    name=source_name,
-                    source_type="mock",
-                    is_active=True,
-                    config=config
-                )
-                db.add(source)
-
-            # Add Slack source (initially inactive)
-            slack_source = Source(
-                name="Slack",
-                source_type="real",
-                is_active=False,
-                config={"token": None, "channel_ids": []}
-            )
-            db.add(slack_source)
-
-            db.commit()
-            print(f"✓ Created {db.query(Source).count()} sources")
+            print("⚠️  No sources configured. Add real integrations (Slack, GitHub, Discord, Reddit) to get started.")
+        else:
+            print(f"✓ Found {existing_sources} configured sources")
 
     print("✓ Compass API ready!")
     print("✓ WebSocket support enabled at /ws")
@@ -1926,7 +1907,503 @@ async def get_slack_status(db: Session = Depends(get_db_session)):
     }
 
 
-# --- Linear Integration Endpoints ---
+# --- GitHub OAuth Integration Endpoints ---
+
+class GitHubOAuthRequest(BaseModel):
+    """Request model for GitHub OAuth."""
+    client_id: str
+    client_secret: str
+    code: str
+
+
+class GitHubSelectReposRequest(BaseModel):
+    """Request model for selecting repositories to monitor."""
+    repository_full_names: List[str]
+    labels: Optional[List[str]] = None
+
+
+class GitHubSyncRequest(BaseModel):
+    """Request model for syncing GitHub issues."""
+    limit: Optional[int] = 100
+
+
+@app.get("/api/auth/github")
+async def start_github_oauth(
+    client_id: str = Query(..., description="GitHub OAuth App Client ID")
+):
+    """
+    Start GitHub OAuth flow.
+
+    Returns the OAuth authorization URL to redirect the user to.
+    """
+    from connectors.github import get_oauth_url
+
+    # In production, use proper redirect URI from config
+    redirect_uri = "http://localhost:3000/oauth/github/callback"
+
+    oauth_url = get_oauth_url(
+        client_id=client_id,
+        redirect_uri=redirect_uri,
+        scope="repo"
+    )
+
+    return {
+        "oauth_url": oauth_url
+    }
+
+
+@app.post("/api/auth/github/callback")
+async def github_oauth_callback(
+    request: GitHubOAuthRequest,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Handle GitHub OAuth callback and exchange code for token.
+    """
+    from connectors.github import exchange_code_for_token, GitHubConnector
+
+    # Exchange code for access token
+    access_token = await exchange_code_for_token(
+        client_id=request.client_id,
+        client_secret=request.client_secret,
+        code=request.code
+    )
+
+    if not access_token:
+        raise HTTPException(status_code=400, detail="Failed to exchange code for token")
+
+    # Test the connection
+    connector = GitHubConnector(access_token)
+    if not await connector.test_connection():
+        raise HTTPException(status_code=400, detail="Invalid access token")
+
+    # Get user info
+    user_info = await connector.get_user_info()
+
+    # Store token in database
+    source = db.query(Source).filter(Source.name == "GitHub").first()
+
+    if not source:
+        source = Source(
+            name="GitHub",
+            source_type="real",
+            is_active=False,
+            config={
+                "access_token": access_token,
+                "user_login": user_info.get("login") if user_info else None,
+                "repositories": []
+            }
+        )
+        db.add(source)
+    else:
+        source.config = {
+            "access_token": access_token,
+            "user_login": user_info.get("login") if user_info else None,
+            "repositories": source.config.get("repositories", []) if source.config else []
+        }
+
+    db.commit()
+    db.refresh(source)
+
+    return {
+        "success": True,
+        "message": "GitHub connected successfully",
+        "user": user_info
+    }
+
+
+@app.get("/api/connectors/github/repositories")
+async def get_github_repositories(db: Session = Depends(get_db_session)):
+    """Get list of repositories the user has access to."""
+    from connectors.github import GitHubConnector
+
+    source = db.query(Source).filter(Source.name == "GitHub").first()
+
+    if not source or not source.config or not source.config.get("access_token"):
+        raise HTTPException(status_code=400, detail="GitHub not connected. Complete OAuth first.")
+
+    connector = GitHubConnector(source.config["access_token"])
+    repositories = await connector.get_repositories(limit=100)
+
+    return {
+        "repositories": repositories,
+        "count": len(repositories)
+    }
+
+
+@app.post("/api/connectors/github/configure")
+async def configure_github_repositories(
+    request: GitHubSelectReposRequest,
+    db: Session = Depends(get_db_session)
+):
+    """Configure which repositories to monitor for feedback."""
+    source = db.query(Source).filter(Source.name == "GitHub").first()
+
+    if not source:
+        raise HTTPException(status_code=400, detail="GitHub not connected. Complete OAuth first.")
+
+    # Update configuration
+    source.config["repositories"] = request.repository_full_names
+    source.config["labels"] = request.labels or []
+    source.is_active = True
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Configured {len(request.repository_full_names)} repositories",
+        "repositories": request.repository_full_names
+    }
+
+
+@app.post("/api/connectors/github/sync")
+async def sync_github_issues(
+    request: Optional[GitHubSyncRequest] = None,
+    db: Session = Depends(get_db_session)
+):
+    """Sync issues and comments from configured GitHub repositories."""
+    from connectors.github import GitHubConnector
+
+    source = db.query(Source).filter(Source.name == "GitHub").first()
+
+    if not source or not source.is_active:
+        raise HTTPException(status_code=400, detail="GitHub not configured")
+
+    if not source.config or not source.config.get("access_token"):
+        raise HTTPException(status_code=400, detail="GitHub access token not found")
+
+    repositories = source.config.get("repositories", [])
+    if not repositories:
+        raise HTTPException(status_code=400, detail="No repositories configured")
+
+    connector = GitHubConnector(source.config["access_token"])
+    labels = source.config.get("labels", [])
+    limit = request.limit if request else 100
+
+    synced_count = 0
+
+    for repo_full_name in repositories:
+        # Fetch issues
+        issues = await connector.fetch_issues(
+            repo_full_name=repo_full_name,
+            state="all",
+            labels=labels if labels else None,
+            limit=limit
+        )
+
+        for issue in issues:
+            # Check if issue already exists
+            existing = db.query(Feedback).filter(
+                Feedback.source_id == source.id,
+                Feedback.source_metadata["github_issue_id"].astext == str(issue["id"])
+            ).first()
+
+            if existing:
+                continue
+
+            # Calculate vote count from reactions
+            reactions = issue.get("reactions", {})
+            vote_count = sum([
+                reactions.get("+1", 0),
+                reactions.get("heart", 0),
+                reactions.get("hooray", 0),
+                reactions.get("rocket", 0)
+            ])
+
+            # Fetch issue comments
+            comments = await connector.fetch_issue_comments(
+                repo_full_name=repo_full_name,
+                issue_number=issue["number"]
+            )
+
+            # Create feedback for issue
+            feedback = Feedback(
+                source_id=source.id,
+                text=f"{issue['title']}\n\n{issue['body']}",
+                title=issue["title"],
+                customer_name=issue["user"]["login"],
+                submitted_at=datetime.fromisoformat(issue["created_at"].replace("Z", "+00:00")),
+                source_metadata={
+                    "github_issue_id": issue["id"],
+                    "github_issue_number": issue["number"],
+                    "github_repo": repo_full_name,
+                    "github_url": issue["url"],
+                    "github_state": issue["state"],
+                    "github_labels": issue["labels"],
+                    "vote_count": vote_count,
+                    "comments_count": issue["comments_count"]
+                }
+            )
+            db.add(feedback)
+            synced_count += 1
+
+            # Create feedback for each comment
+            for comment in comments:
+                comment_reactions = comment.get("reactions", {})
+                comment_votes = sum([
+                    comment_reactions.get("+1", 0),
+                    comment_reactions.get("heart", 0),
+                    comment_reactions.get("hooray", 0),
+                    comment_reactions.get("rocket", 0)
+                ])
+
+                comment_feedback = Feedback(
+                    source_id=source.id,
+                    text=comment["body"],
+                    title=f"Comment on: {issue['title']}",
+                    customer_name=comment["user"]["login"],
+                    submitted_at=datetime.fromisoformat(comment["created_at"].replace("Z", "+00:00")),
+                    source_metadata={
+                        "github_comment_id": comment["id"],
+                        "github_issue_id": issue["id"],
+                        "github_issue_number": issue["number"],
+                        "github_repo": repo_full_name,
+                        "vote_count": comment_votes
+                    }
+                )
+                db.add(comment_feedback)
+                synced_count += 1
+
+    source.last_synced_at = datetime.utcnow()
+    db.commit()
+
+    return {
+        "success": True,
+        "synced": synced_count,
+        "repositories": repositories
+    }
+
+
+@app.get("/api/connectors/github/status")
+async def get_github_status(db: Session = Depends(get_db_session)):
+    """Get GitHub connection status."""
+    source = db.query(Source).filter(Source.name == "GitHub").first()
+
+    if not source:
+        return {
+            "connected": False,
+            "message": "GitHub not configured"
+        }
+
+    feedback_count = db.query(Feedback).filter(Feedback.source_id == source.id).count()
+
+    return {
+        "connected": source.is_active,
+        "repositories": source.config.get("repositories", []) if source.config else [],
+        "labels": source.config.get("labels", []) if source.config else [],
+        "last_synced": source.last_synced_at.isoformat() if source.last_synced_at else None,
+        "feedback_count": feedback_count
+    }
+
+
+# --- Linear OAuth Integration Endpoints ---
+
+class LinearOAuthCallbackRequest(BaseModel):
+    """Request model for Linear OAuth callback."""
+    code: str
+    state: Optional[str] = None
+
+
+class LinearSyncRequest(BaseModel):
+    """Request model for syncing Linear issues."""
+    team_id: Optional[str] = None
+    limit: Optional[int] = 50
+
+
+@app.get("/api/auth/linear")
+async def linear_oauth_start():
+    """
+    Start Linear OAuth flow.
+
+    Returns authorization URL for user to authorize the app.
+    """
+    from connectors.linear import get_oauth_url
+    import secrets
+
+    # Generate state for CSRF protection
+    state = secrets.token_urlsafe(32)
+
+    # In production, store state in session or database
+    oauth_url = get_oauth_url(state=state)
+
+    return {
+        "auth_url": oauth_url,
+        "state": state,
+        "message": "Redirect user to auth_url to authorize Linear access"
+    }
+
+
+@app.get("/api/auth/linear/callback")
+async def linear_oauth_callback(
+    code: str,
+    state: Optional[str] = None,
+    db: Session = Depends(get_db_session)
+):
+    """
+    Handle Linear OAuth callback.
+
+    Exchanges authorization code for access token and stores it.
+    """
+    from connectors.linear import exchange_code_for_token, test_connection
+
+    try:
+        # Exchange code for access token
+        token_response = await exchange_code_for_token(code)
+        access_token = token_response.get("access_token")
+
+        if not access_token:
+            raise HTTPException(status_code=400, detail="Failed to obtain access token")
+
+        # Test connection to verify token
+        test_result = await test_connection(access_token)
+
+        if not test_result.get("connected"):
+            raise HTTPException(status_code=400, detail="Failed to connect to Linear API")
+
+        # Store or update Linear source
+        source = db.query(Source).filter(Source.name == "Linear").first()
+
+        if not source:
+            source = Source(
+                name="Linear",
+                source_type="real",
+                is_active=True,
+                config={
+                    "access_token": access_token,
+                    "user": test_result.get("user"),
+                    "teams": test_result.get("teams")
+                }
+            )
+            db.add(source)
+        else:
+            source.config = {
+                **source.config,
+                "access_token": access_token,
+                "user": test_result.get("user"),
+                "teams": test_result.get("teams")
+            }
+            source.is_active = True
+
+        db.commit()
+
+        # Emit event
+        await event_emitter.emit({
+            "type": "source_connected",
+            "data": {
+                "source": "Linear",
+                "user": test_result.get("user", {}).get("name"),
+                "team_count": test_result.get("team_count", 0)
+            }
+        })
+
+        return {
+            "success": True,
+            "message": "Linear connected successfully",
+            "user": test_result.get("user"),
+            "teams": test_result.get("teams"),
+            "redirect": "http://localhost:5173/integrations?linear_connected=true"
+        }
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"OAuth callback failed: {str(e)}")
+
+
+@app.post("/api/connectors/linear/sync")
+async def sync_linear_issues(
+    request: Optional[LinearSyncRequest] = None,
+    db: Session = Depends(get_db_session)
+):
+    """Sync issues from Linear to Compass feedback."""
+    from connectors.linear import sync_issues_to_feedback
+
+    # Get Linear source
+    source = db.query(Source).filter(Source.name == "Linear").first()
+
+    if not source or not source.is_active:
+        raise HTTPException(
+            status_code=400,
+            detail="Linear not connected. Connect first via OAuth at GET /api/auth/linear"
+        )
+
+    config = source.config
+    if not config or not config.get("access_token"):
+        raise HTTPException(status_code=400, detail="Linear access token not found")
+
+    # Sync issues
+    team_id = request.team_id if request else None
+    limit = request.limit if request else 50
+
+    result = await sync_issues_to_feedback(
+        db=db,
+        access_token=config["access_token"],
+        team_id=team_id,
+        limit=limit
+    )
+
+    # Emit event
+    await event_emitter.emit({
+        "type": "feedback_synced",
+        "data": {
+            "source": "Linear",
+            "count": result["synced"],
+            "new": result["new"],
+            "updated": result["updated"]
+        }
+    })
+
+    return result
+
+
+@app.get("/api/connectors/linear/status")
+async def get_linear_status(db: Session = Depends(get_db_session)):
+    """Get Linear connection status."""
+    source = db.query(Source).filter(Source.name == "Linear").first()
+
+    if not source:
+        return {
+            "connected": False,
+            "message": "Linear not configured"
+        }
+
+    feedback_count = db.query(Feedback).filter(Feedback.source_id == source.id).count()
+
+    config = source.config or {}
+    user = config.get("user", {})
+    teams = config.get("teams", [])
+
+    return {
+        "connected": source.is_active,
+        "user": {
+            "name": user.get("name"),
+            "email": user.get("email")
+        } if user else None,
+        "teams": teams,
+        "team_count": len(teams),
+        "last_synced": source.last_synced_at.isoformat() if source.last_synced_at else None,
+        "feedback_count": feedback_count
+    }
+
+
+@app.get("/api/connectors/linear/teams")
+async def get_linear_teams(db: Session = Depends(get_db_session)):
+    """Get Linear teams accessible to connected user."""
+    from connectors.linear import LinearConnector
+
+    source = db.query(Source).filter(Source.name == "Linear").first()
+
+    if not source or not source.config or not source.config.get("access_token"):
+        raise HTTPException(status_code=400, detail="Linear not connected")
+
+    connector = LinearConnector(source.config["access_token"])
+    teams = await connector.get_teams()
+
+    return {
+        "teams": teams,
+        "count": len(teams)
+    }
+
+
+# --- Linear Integration Endpoints (API Key based) ---
 
 class LinearConfigRequest(BaseModel):
     """Request model for Linear configuration."""

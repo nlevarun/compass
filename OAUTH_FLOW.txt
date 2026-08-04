@@ -1,0 +1,239 @@
+SLACK OAUTH FLOW - VISUAL DIAGRAM
+================================================================================
+
+USER CLICKS "CONNECT SLACK" BUTTON
+    |
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  FRONTEND (React Component)                                             │
+│                                                                          │
+│  SlackConnector.jsx:                                                    │
+│    - Opens popup window                                                 │
+│    - URL: /api/auth/slack/connect                                      │
+│    - Size: 600x700                                                      │
+│    - Listens for postMessage from popup                                │
+└─────────────────────────────────────────────────────────────────────────┘
+    |
+    | HTTP GET /api/auth/slack/connect
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  BACKEND - OAuth Start Endpoint                                         │
+│                                                                          │
+│  slack_oauth.py:                                                        │
+│    1. Generate random state token (CSRF protection)                     │
+│    2. Store state in memory                                             │
+│    3. Build Slack authorization URL:                                    │
+│       - client_id: from environment                                     │
+│       - scopes: channels:read, channels:history, etc.                   │
+│       - redirect_uri: /api/auth/slack/callback                          │
+│       - state: random token                                             │
+│    4. Return 302 redirect to Slack                                      │
+└─────────────────────────────────────────────────────────────────────────┘
+    |
+    | 302 Redirect
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  SLACK.COM - Authorization Page                                         │
+│                                                                          │
+│  User sees:                                                             │
+│    - App name: "Compass"                                                │
+│    - Workspace selector                                                 │
+│    - Requested permissions list                                         │
+│    - "Allow" / "Deny" buttons                                           │
+│                                                                          │
+│  User clicks "Allow"                                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+    |
+    | Slack redirects to callback URL with code + state
+    |
+    | HTTP GET /api/auth/slack/callback?code=xxx&state=yyy
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  BACKEND - OAuth Callback Endpoint                                      │
+│                                                                          │
+│  slack_oauth.py:                                                        │
+│    1. Verify state token (CSRF check)                                   │
+│    2. Exchange code for access token:                                   │
+│       - POST to slack.com/api/oauth.v2.access                           │
+│       - Send: client_id, client_secret, code                            │
+│       - Receive: access_token, team info, bot info                      │
+│    3. Save to database:                                                 │
+│       - Create Source record                                            │
+│       - Store token in config JSON                                      │
+│       - Mark as active                                                  │
+│    4. Return HTML page with JavaScript:                                 │
+│       - Sends postMessage to parent window                              │
+│       - Closes popup after 2 seconds                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+    |
+    | window.opener.postMessage({type: 'slack_oauth_success', ...})
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  FRONTEND - Receives Success Message                                    │
+│                                                                          │
+│  SlackConnector.jsx:                                                    │
+│    1. EventListener catches postMessage                                 │
+│    2. Calls loadStatus() to refresh UI                                  │
+│    3. Shows "Connected" state                                           │
+│    4. Displays workspace info                                           │
+│    5. Enables "Select Channel" button                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+CONNECTION COMPLETE!
+User can now select channels and sync messages.
+================================================================================
+
+
+SYNCING MESSAGES - SIMPLIFIED FLOW
+================================================================================
+
+USER CLICKS "SELECT CHANNEL" → CHOOSES CHANNEL → CLICKS "SYNC"
+    |
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  FRONTEND                                                                │
+│                                                                          │
+│  POST /api/auth/slack/sync/{source_id}                                  │
+│  Query params: channel_id=C1234567890&limit=100                         │
+└─────────────────────────────────────────────────────────────────────────┘
+    |
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  BACKEND - Sync Endpoint                                                 │
+│                                                                          │
+│  slack_oauth.py:                                                        │
+│    1. Load Source from database (get access token)                      │
+│    2. Call Slack API:                                                   │
+│       - conversations.history(channel=..., oldest=last_sync_ts)         │
+│    3. For each message:                                                 │
+│       - Fetch user info (users.info)                                    │
+│       - Create Feedback record                                          │
+│       - Store metadata (timestamp, link, user)                          │
+│    4. Update Source.last_synced_at                                      │
+│    5. Return count of synced messages                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+    |
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  DATABASE                                                                │
+│                                                                          │
+│  feedback table:                                                        │
+│    - id: auto-increment                                                 │
+│    - source_id: links to Slack source                                   │
+│    - text: message content                                              │
+│    - customer_name: Slack user real name                                │
+│    - submitted_at: message timestamp                                    │
+│    - source_metadata: {slack_ts, slack_channel, slack_permalink}        │
+└─────────────────────────────────────────────────────────────────────────┘
+    |
+    v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  FRONTEND - Shows Success                                                │
+│                                                                          │
+│  Alert: "✓ Synced 23 new messages from #customer-feedback!"            │
+│  User can now view messages in Feedback tab                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+SYNC COMPLETE!
+Messages are now available for clustering and roadmap generation.
+================================================================================
+
+
+DATA FLOW - WHAT HAPPENS TO A SLACK MESSAGE
+================================================================================
+
+Slack Message in #customer-feedback:
+┌─────────────────────────────────────────┐
+│ @john.doe 10:30 AM                      │
+│ We really need better analytics         │
+│ for tracking user engagement            │
+└─────────────────────────────────────────┘
+                |
+                v
+        [OAuth Token Used]
+                |
+                v
+        [Slack API Call]
+                |
+                v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Compass Feedback Record                                                 │
+│                                                                          │
+│  id: 456                                                                 │
+│  source_id: 1 (Slack - My Workspace)                                    │
+│  text: "We really need better analytics for tracking user engagement"   │
+│  title: "Slack message from John Doe"                                   │
+│  customer_name: "John Doe"                                              │
+│  submitted_at: 2026-08-04 10:30:00                                      │
+│  source_metadata: {                                                     │
+│    "slack_ts": "1722768600.123456",                                     │
+│    "slack_channel": "C1234567890",                                      │
+│    "slack_user": "U0987654321",                                         │
+│    "slack_permalink": "https://slack.com/archives/C1234567890/p..."    │
+│  }                                                                       │
+└─────────────────────────────────────────────────────────────────────────┘
+                |
+                v
+        [NLP Clustering]
+                |
+                v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Cluster: "Analytics & Reporting Features"                              │
+│  Contains: 15 feedback items (including this one)                       │
+│  Priority Score: 87.5                                                   │
+└─────────────────────────────────────────────────────────────────────────┘
+                |
+                v
+        [Roadmap Generation]
+                |
+                v
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Roadmap Item #3                                                         │
+│  Title: "Build Advanced Analytics Dashboard"                            │
+│  Rank: 3 (high priority)                                                │
+│  Request Count: 15                                                       │
+│  Status: Proposed                                                        │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================
+MESSAGE JOURNEY COMPLETE!
+From Slack message → Feedback → Cluster → Roadmap item
+================================================================================
+
+
+SECURITY FEATURES
+================================================================================
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  CSRF Protection                                                         │
+│  ─────────────────────────────────────────────────────────────────────  │
+│  State token:                                                           │
+│    - Generated: secrets.token_urlsafe(32)                               │
+│    - Stored: In-memory dict (oauth_states)                              │
+│    - Validated: On callback                                             │
+│    - Expired: After use (deleted from dict)                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Token Storage                                                           │
+│  ─────────────────────────────────────────────────────────────────────  │
+│  Access tokens:                                                         │
+│    - Stored: Database config JSON field                                 │
+│    - Never returned: In API responses                                   │
+│    - Encrypted: Can add encryption at rest                              │
+│    - Revoked: On disconnect via Slack API                               │
+└─────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│  Scope Validation                                                        │
+│  ─────────────────────────────────────────────────────────────────────  │
+│  Requested scopes:                                                      │
+│    - Minimal: Only what's needed                                        │
+│    - Documented: In OAuth setup guide                                   │
+│    - Audited: Stored with token                                         │
+│    - Validated: By Slack during auth                                    │
+└─────────────────────────────────────────────────────────────────────────┘
+
+================================================================================

@@ -6,10 +6,13 @@ import RoadmapDashboard from './components/RoadmapDashboard';
 import Dashboard from './components/Dashboard';
 import PriorityAnalysis from './components/PriorityAnalysis';
 import SlackConnector from './components/SlackConnector';
+import GitHubConnector from './components/GitHubConnector';
+import LinearConnector from './components/LinearConnector';
 import OfflineBanner from './components/OfflineBanner';
 import InstallPrompt from './components/InstallPrompt';
 import Toast from './components/Toast';
 import websocketService from './services/websocket';
+import api from './services/api';
 
 function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -17,24 +20,63 @@ function App() {
   const [isConnected, setIsConnected] = useState(false);
 
   useEffect(() => {
-    // Connect to WebSocket with error handling
+    let healthCheckInterval = null;
+    let isComponentMounted = true;
+
+    // Check API connectivity using health check endpoint
+    const checkApiConnection = async () => {
+      try {
+        const response = await api.get('/', { timeout: 5000 });
+        if (response.status === 200 && isComponentMounted) {
+          setIsConnected(true);
+          console.log('[App] Backend connected');
+        }
+      } catch (error) {
+        if (isComponentMounted) {
+          setIsConnected(false);
+          // Log less verbosely - only log every 30 seconds to avoid spam
+          if (!checkApiConnection.lastLogTime || Date.now() - checkApiConnection.lastLogTime > 30000) {
+            console.warn('[App] Backend not reachable at http://localhost:8000');
+            checkApiConnection.lastLogTime = Date.now();
+          }
+        }
+      }
+    };
+
+    // Initial connection check
+    checkApiConnection();
+
+    // Poll API health every 10 seconds
+    healthCheckInterval = setInterval(checkApiConnection, 10000);
+
+    // Try to connect to WebSocket (non-blocking, optional)
+    // WebSocket provides real-time updates but is not required for basic functionality
     try {
       websocketService.connect();
     } catch (error) {
-      console.error('Failed to connect to WebSocket:', error);
+      console.warn('[App] WebSocket unavailable - real-time updates disabled');
+      // Don't block app functionality if WebSocket fails
     }
 
-    // Listen for connection status
+    // Listen for WebSocket connection status (but don't depend on it for "connected" state)
     const unsubscribe = websocketService.onStateChange((newState) => {
-      setIsConnected(newState === 'connected');
+      // Only update if WebSocket connects successfully
+      if (newState === 'connected' && isComponentMounted) {
+        setIsConnected(true);
+        console.log('[App] WebSocket connected - real-time updates enabled');
+      }
     });
 
     return () => {
+      isComponentMounted = false;
+      if (healthCheckInterval) {
+        clearInterval(healthCheckInterval);
+      }
       unsubscribe();
       try {
         websocketService.disconnect();
       } catch (error) {
-        console.error('Error disconnecting WebSocket:', error);
+        console.error('[App] Error disconnecting WebSocket:', error);
       }
     };
   }, []);
@@ -117,8 +159,8 @@ function App() {
             <div className="flex items-center space-x-3">
               {/* Connection Status */}
               <div className="flex items-center space-x-2">
-                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-                <span className="text-xs text-gray-500">{isConnected ? 'Connected' : 'Offline'}</span>
+                <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+                <span className="text-xs text-gray-500">{isConnected ? 'Connected' : 'Backend Offline'}</span>
               </div>
 
               <button className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-50">
@@ -144,7 +186,11 @@ function App() {
                 <h2 className="text-2xl font-bold text-gray-900">Collect Feedback</h2>
                 <p className="text-gray-600 mt-1">Connect data sources to import customer feedback</p>
               </div>
-              <SlackConnector />
+              <div className="space-y-6">
+                <SlackConnector />
+                <GitHubConnector />
+                <LinearConnector />
+              </div>
             </div>
           )}
           {activeTab === 'feedback' && <FeedbackInbox showToast={showToast} />}

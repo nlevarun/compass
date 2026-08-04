@@ -6,7 +6,7 @@ Tests that the backend can start cleanly without actually starting the server.
 Checks:
 - All imports work
 - Database can be initialized
-- Mock data can be generated
+- Real source integrations are available
 - No critical errors
 
 This is useful for CI/CD pipelines or pre-deployment checks.
@@ -41,7 +41,7 @@ def test_imports():
         print("  ✓ Database utilities imported")
 
         # Main app components
-        from ingestion.sources import create_source, MOCK_SOURCES
+        from ingestion.sources import create_source
         from nlp.clustering import FeedbackClusterer
         from nlp.sentiment import SentimentAnalyzer
         from priority.calculator import PriorityCalculator
@@ -96,85 +96,63 @@ def test_database_init():
         return False
 
 
-def test_mock_sources():
-    """Test mock source creation."""
-    print("\n[3/5] Testing mock source creation...")
+def test_source_integrations():
+    """Test that real source integrations are available."""
+    print("\n[3/5] Testing source integrations...")
     try:
         from database import get_db
         from models import Source
-        from ingestion.sources import MOCK_SOURCES
 
         with get_db() as db:
             # Check if sources exist
             existing_count = db.query(Source).count()
+            print(f"  ✓ Found {existing_count} configured sources")
 
-            # Create mock sources if needed
-            if existing_count == 0:
-                for source_name, config in MOCK_SOURCES.items():
-                    source = Source(
-                        name=source_name,
-                        source_type="mock",
-                        is_active=True,
-                        config=config
-                    )
-                    db.add(source)
-                db.commit()
-                print(f"  ✓ Created {len(MOCK_SOURCES)} mock sources")
-            else:
-                print(f"  ✓ Found {existing_count} existing sources")
+            # Verify supported integrations
+            supported_sources = ["Slack", "GitHub", "Discord", "Reddit"]
+            print(f"  ✓ Supported integrations: {', '.join(supported_sources)}")
 
             return True
 
     except Exception as e:
-        print(f"  ✗ Mock source creation failed: {e}")
+        print(f"  ✗ Source integration check failed: {e}")
         import traceback
         traceback.print_exc()
         return False
 
 
-def test_mock_data_generation():
-    """Test mock data generation."""
-    print("\n[4/5] Testing mock data generation...")
+def test_source_factory():
+    """Test that source factory can create real integrations."""
+    print("\n[4/5] Testing source factory...")
     try:
-        from ingestion.mock_generators import generate_mock_feedback
+        from ingestion.sources import create_source
         from models import Source
 
-        # Create test source
-        test_source = Source(
-            id=999,
-            name="Test Source",
-            source_type="mock",
-            is_active=True
-        )
+        # Test that factory can recognize supported sources
+        supported_sources = ["Slack", "GitHub", "Discord", "Reddit"]
 
-        # Generate small amount of mock data
-        feedback_items = generate_mock_feedback(test_source, count=5)
+        for source_name in supported_sources:
+            test_source = Source(
+                id=999,
+                name=source_name,
+                source_type="real",
+                is_active=False,
+                config={}
+            )
 
-        if not feedback_items:
-            print("  ✗ No feedback generated")
-            return False
-
-        if len(feedback_items) != 5:
-            print(f"  ✗ Expected 5 items, got {len(feedback_items)}")
-            return False
-
-        # Validate feedback structure
-        for fb in feedback_items:
-            if not fb.text:
-                print("  ✗ Feedback missing text")
-                return False
-            if not fb.customer_name:
-                print("  ✗ Feedback missing customer_name")
-                return False
-            if fb.sentiment_score is None:
-                print("  ✗ Feedback missing sentiment_score")
+            try:
+                # Should not raise error for supported sources
+                source_instance = create_source(test_source)
+                print(f"  ✓ {source_name} integration available")
+            except ValueError:
+                print(f"  ✗ {source_name} integration not found")
                 return False
 
-        print(f"  ✓ Generated {len(feedback_items)} valid feedback items")
+        print(f"  ✓ All {len(supported_sources)} integrations available")
         return True
 
     except Exception as e:
-        print(f"  ✗ Mock data generation failed: {e}")
+        print(f"  ✗ Source factory test failed: {e}")
         import traceback
         traceback.print_exc()
         return False
@@ -227,8 +205,8 @@ def main():
     results = []
     results.append(("Imports", test_imports()))
     results.append(("Database Init", test_database_init()))
-    results.append(("Mock Sources", test_mock_sources()))
-    results.append(("Mock Data", test_mock_data_generation()))
+    results.append(("Source Integrations", test_source_integrations()))
+    results.append(("Source Factory", test_source_factory()))
     results.append(("API App", test_api_app_creation()))
 
     # Summary

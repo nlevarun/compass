@@ -1,7 +1,7 @@
 """
 Base class and implementations for feedback sources.
 
-Supports 8 sources: 1 real (Slack) + 7 mock
+Supports real integrations: Slack, GitHub, Discord, Reddit
 """
 
 from abc import ABC, abstractmethod
@@ -14,7 +14,6 @@ import os
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from models import Source, Feedback
-from ingestion.mock_generators import generate_mock_feedback, MOCK_SOURCES
 
 
 class FeedbackSource(ABC):
@@ -41,63 +40,6 @@ class FeedbackSource(ABC):
     def validate_config(self) -> bool:
         """Validate source configuration."""
         return True
-
-
-class MockSource(FeedbackSource):
-    """Mock feedback source that generates synthetic data."""
-
-    def fetch_feedback(self, since: Optional[datetime] = None) -> List[Dict]:
-        """Generate mock feedback data."""
-        # Get count from mock sources config
-        count = MOCK_SOURCES.get(self.name, {}).get("feedback_count", 50)
-
-        # Generate mock data
-        feedback = generate_mock_feedback(self.name, count)
-
-        # Filter by date if specified
-        if since:
-            feedback = [f for f in feedback if f["submitted_at"] > since]
-
-        # Add source_id to each entry
-        for f in feedback:
-            f["source_id"] = self.source_id
-
-        return feedback
-
-
-class EmailSource(MockSource):
-    """Email feedback source (support@company.com, feature-requests@company.com)."""
-    pass
-
-
-class SupportTicketSource(MockSource):
-    """Support ticket source (Zendesk, Intercom, Freshdesk)."""
-    pass
-
-
-class SurveySource(MockSource):
-    """Survey feedback source (Typeform, SurveyMonkey, Google Forms)."""
-    pass
-
-
-class AppReviewSource(MockSource):
-    """App store review source (iOS App Store, Google Play)."""
-    pass
-
-
-class SalesCallSource(MockSource):
-    """Sales call notes and transcripts."""
-    pass
-
-
-class UserInterviewSource(MockSource):
-    """User research interview transcripts."""
-    pass
-
-
-class SocialMediaSource(MockSource):
-    """Social media mentions (Twitter, LinkedIn, Reddit)."""
-    pass
 
 
 class SlackSource(FeedbackSource):
@@ -845,44 +787,22 @@ def create_source(source_model: Source) -> FeedbackSource:
     """Create appropriate source instance based on source model."""
 
     source_map = {
-        # Mock sources
-        "Email": EmailSource,
-        "Support Tickets": SupportTicketSource,
-        "Surveys": SurveySource,
-        "App Reviews": AppReviewSource,
-        "Sales Calls": SalesCallSource,
-        "User Interviews": UserInterviewSource,
-        "Social Media": SocialMediaSource,
-
-        # Real integrations
+        # Real integrations only
         "Slack": SlackSource,
         "GitHub": GitHubSource,
         "Discord": DiscordSource,
         "Reddit": RedditSource
     }
 
-    source_class = source_map.get(source_model.name, MockSource)
+    source_class = source_map.get(source_model.name)
+    if not source_class:
+        raise ValueError(f"Unknown source type: {source_model.name}. Supported: {', '.join(source_map.keys())}")
+
     return source_class(source_model.id, source_model.name, source_model.config)
 
 
 if __name__ == "__main__":
     # Test source creation
     print("Testing feedback sources...\n")
-
-    # Create a mock source
-    from models import Source
-
-    test_source = Source(
-        id=1,
-        name="Email",
-        source_type="mock",
-        is_active=True
-    )
-
-    source = create_source(test_source)
-    feedback = source.fetch_feedback()
-
-    print(f"✓ Generated {len(feedback)} feedback entries from {test_source.name}")
-    print(f"\nSample feedback:")
-    for f in feedback[:3]:
-        print(f"  • {f['customer_name']}: \"{f['text'][:80]}...\"")
+    print("Available sources: Slack, GitHub, Discord, Reddit")
+    print("All sources require configuration. See INTEGRATION_GUIDE.md for setup instructions.")

@@ -79,8 +79,8 @@ class WebSocketService {
     this.messageQueue = [];
     this.maxQueueSize = 50;
 
-    // Auto-connect flag
-    this.autoConnect = true;
+    // Auto-connect flag (disabled by default to prevent connection errors)
+    this.autoConnect = false;
 
     // Subscribed rooms
     this.subscribedRooms = new Set();
@@ -97,6 +97,7 @@ class WebSocketService {
 
     console.log('[WS] Connecting to:', WS_URL);
     this.updateConnectionState(ConnectionState.CONNECTING);
+    this.autoConnect = true;
 
     try {
       this.ws = new WebSocket(WS_URL);
@@ -213,13 +214,9 @@ class WebSocketService {
    */
   attemptReconnect() {
     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
-      console.error('[WS] Max reconnect attempts reached');
-      this.updateConnectionState(ConnectionState.ERROR);
-      this.dispatchEvent(EventTypes.NOTIFICATION, {
-        level: 'error',
-        title: 'Connection Lost',
-        message: 'Unable to reconnect to server. Please refresh the page.',
-      });
+      console.warn('[WS] Max reconnect attempts reached - WebSocket will remain disconnected');
+      this.updateConnectionState(ConnectionState.DISCONNECTED);
+      // Don't show error notification - app can work without WebSocket
       return;
     }
 
