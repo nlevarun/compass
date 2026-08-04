@@ -409,16 +409,34 @@ async def sync_slack_messages(
                 channel_name = "unknown"
                 print(f"   Could not fetch channel name")
 
+            # Try to join the channel first (in case bot isn't a member)
+            try:
+                print(f"   Attempting to join channel...")
+                client.conversations_join(channel=channel_id)
+                print(f"   ✅ Joined channel successfully!")
+            except SlackApiError as join_error:
+                if join_error.response.get("error") == "already_in_channel":
+                    print(f"   ✅ Already in channel")
+                elif join_error.response.get("error") == "is_archived":
+                    raise HTTPException(status_code=400, detail="Cannot sync archived channel")
+                elif join_error.response.get("error") == "channel_not_found":
+                    raise HTTPException(status_code=404, detail="Channel not found")
+                else:
+                    # Non-critical error, continue anyway
+                    print(f"   ⚠️  Could not join channel: {join_error.response.get('error')}")
+
             # Fetch messages
             oldest = None
             if source.last_synced_at:
                 oldest = str(source.last_synced_at.timestamp())
 
+            print(f"   Fetching messages...")
             response = client.conversations_history(
                 channel=channel_id,
                 limit=limit,
                 oldest=oldest
             )
+            print(f"   ✅ Fetched {len(response.get('messages', []))} messages")
 
             messages = response.get("messages", [])
             synced_count = 0
@@ -508,7 +526,7 @@ async def sync_slack_messages(
             if e.response.get("error") == "not_in_channel":
                 raise HTTPException(
                     status_code=400,
-                    detail="Bot is not in this channel. Please invite the bot by typing '/invite @YourAppName' in the Slack channel first."
+                    detail="Bot could not join this channel. It may be a private channel or archived."
                 )
             elif e.response.get("error") == "channel_not_found":
                 raise HTTPException(
