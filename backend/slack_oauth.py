@@ -373,6 +373,11 @@ async def sync_slack_messages(
     """
     Sync messages from a Slack channel.
     """
+    print(f"🔄 Slack sync requested:")
+    print(f"   Source ID: {source_id}")
+    print(f"   Channel ID: {channel_id}")
+    print(f"   Limit: {limit}")
+
     with next(get_db_session()) as db:
         source = db.query(Source).filter(
             Source.id == source_id,
@@ -394,6 +399,15 @@ async def sync_slack_messages(
             # Get bot user ID to filter out bot messages
             auth_response = client.auth_test()
             bot_user_id = auth_response.get("user_id")
+
+            # Get channel info to show name in logs
+            try:
+                channel_info = client.conversations_info(channel=channel_id)
+                channel_name = channel_info["channel"]["name"]
+                print(f"   Channel name: #{channel_name}")
+            except:
+                channel_name = "unknown"
+                print(f"   Could not fetch channel name")
 
             # Fetch messages
             oldest = None
