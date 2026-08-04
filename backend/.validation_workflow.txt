@@ -1,0 +1,200 @@
+
+╔══════════════════════════════════════════════════════════════════════════╗
+║                    COMPASS VALIDATION WORKFLOW                           ║
+╚══════════════════════════════════════════════════════════════════════════╝
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                          FRESH INSTALLATION                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    1. Install dependencies
+       └─> pip install -r requirements-minimal.txt
+
+    2. Run comprehensive validation
+       └─> python validate_system.py
+           ├─ [1/8] File Structure ✓
+           ├─ [2/8] Dependencies ✓
+           ├─ [3/8] Database Schema ✓
+           ├─ [4/8] Model Integrity ✓
+           ├─ [5/8] Cross-Platform ✓
+           ├─ [6/8] API Endpoints ✓
+           ├─ [7/8] Frontend Integration ✓
+           └─ [8/8] Mock Data Generation ✓
+
+    3. Start backend
+       └─> python main.py
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         DAILY DEVELOPMENT                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    1. Quick startup check
+       └─> python test_startup.py
+           ├─ [1/5] Imports ✓
+           ├─ [2/5] Database Init ✓
+           ├─ [3/5] Mock Sources ✓
+           ├─ [4/5] Mock Data ✓
+           └─ [5/5] API App ✓
+
+    2. Start backend (if test passes)
+       └─> python main.py
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      AFTER PULLING NEW CODE                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    1. Pull latest code
+       └─> git pull origin main
+
+    2. Fix database (if schema changed)
+       └─> python fix_db.py
+           ├─ Verify models ✓
+           ├─ Delete old DB ✓
+           └─ Ready for restart ✓
+
+    3. Run validation
+       └─> python validate_system.py
+
+    4. Start backend
+       └─> python main.py
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                      TROUBLESHOOTING ERRORS                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    ERROR: "no such column: feedback.external_ids"
+    FIX: python fix_db.py
+         └─> Deletes old DB, restart creates new schema
+
+    ERROR: "Module not found"
+    FIX: pip install --upgrade -r requirements-minimal.txt
+         └─> Reinstalls all dependencies
+
+    ERROR: "Database is locked"
+    FIX: 1. Kill backend: lsof -ti:8000 | xargs kill -9
+         2. Remove locks: rm -f compass.db-wal compass.db-shm
+         3. Restart: python main.py
+
+    ERROR: Validation fails
+    FIX: python validate_system.py
+         └─> Shows specific errors with fix suggestions
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         SCRIPT DECISION TREE                             │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    Need comprehensive check?
+    ├─ YES → python validate_system.py (~30s)
+    │        Complete system validation
+    │        Use: Before deployment, after updates
+    │
+    └─ NO  → Need quick check?
+             ├─ YES → python test_startup.py (~10s)
+             │        Quick backend validation
+             │        Use: Daily development, CI/CD
+             │
+             └─ NO  → Database error?
+                      ├─ YES → python fix_db.py (~2s)
+                      │        Reset database
+                      │        Use: Schema errors
+                      │
+                      └─ NO  → Just start!
+                               └─> python main.py
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            CI/CD PIPELINE                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    GitHub Actions / Jenkins / etc:
+
+    1. Checkout code
+    2. Install dependencies
+    3. Run validation
+       └─> python validate_system.py
+           Exit code 0 = PASS → Continue
+           Exit code 1 = FAIL → Stop pipeline
+    4. Run startup test
+       └─> python test_startup.py
+           Exit code 0 = PASS → Continue
+           Exit code 1 = FAIL → Stop pipeline
+    5. Deploy
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                         VALIDATION COVERAGE                              │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    validate_system.py:
+    ┌───────────────────────────┐
+    │ Files          ✓ 45       │
+    │ Dependencies   ✓ 13       │
+    │ Tables         ✓ 10       │
+    │ Models         ✓ 9        │
+    │ Paths          ✓ Check    │
+    │ API Routes     ✓ 9+       │
+    │ Frontend       ✓ Check    │
+    │ Mock Data      ✓ Test     │
+    └───────────────────────────┘
+
+    test_startup.py:
+    ┌───────────────────────────┐
+    │ Imports        ✓ 4        │
+    │ Database       ✓ Init     │
+    │ Sources        ✓ 8        │
+    │ Mock Data      ✓ 5        │
+    │ API App        ✓ Create   │
+    └───────────────────────────┘
+
+    fix_db.py:
+    ┌───────────────────────────┐
+    │ Models         ✓ Verify   │
+    │ Database       ✓ Delete   │
+    │ Path           ✓ Check    │
+    └───────────────────────────┘
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                           SUCCESS METRICS                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    ✓ All tests passing
+    ✓ 0 failures
+    ✓ 0 critical warnings
+    ✓ Backend starts successfully
+    ✓ Frontend connects
+    ✓ WebSocket connects (green indicator)
+    ✓ API docs accessible at http://localhost:8000/docs
+    ✓ Dashboard loads at http://localhost:5173
+
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│                            QUICK COMMANDS                                │
+└─────────────────────────────────────────────────────────────────────────┘
+
+    # Full validation
+    python validate_system.py
+
+    # Quick test
+    python test_startup.py
+
+    # Fix database
+    python fix_db.py
+
+    # Init database manually
+    python database.py
+
+    # Start backend
+    python main.py
+
+    # Chain commands (Unix)
+    python test_startup.py && python main.py
+
+    # Chain commands (Windows)
+    python test_startup.py & if %errorlevel% == 0 python main.py
+
+═══════════════════════════════════════════════════════════════════════════
